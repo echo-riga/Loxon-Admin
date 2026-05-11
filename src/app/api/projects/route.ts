@@ -1,15 +1,34 @@
 ﻿import { NextResponse } from 'next/server'
 import pool from '@/lib/db'
  
+
 export async function GET() {
   try {
-    const result = await pool.query('SELECT * FROM projects ORDER BY created_at DESC')
+    const result = await pool.query(`
+      SELECT 
+        p.*,
+        COALESCE(
+          (SELECT json_agg(
+            json_build_object(
+              'id', pi.id, 
+              'image_url', pi.image_url, 
+              'caption', pi.caption, 
+              'display_order', pi.display_order
+            ) ORDER BY pi.display_order
+          )
+          FROM project_images pi WHERE pi.project_id = p.id),
+          '[]'::json
+        ) as images
+      FROM projects p
+      ORDER BY p.created_at DESC
+    `)
     return NextResponse.json(result.rows)
-  } catch {
-    return NextResponse.json({ error: 'Failed to fetch' }, { status: 500 })
+  } catch (error) {
+    console.error(error)
+    return NextResponse.json({ error: 'Failed to fetch projects' }, { status: 500 })
   }
 }
- 
+
 export async function POST(request: Request) {
   try {
     const { image_url, title, description, video_url } = await request.json()
