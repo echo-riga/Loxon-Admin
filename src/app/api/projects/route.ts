@@ -1,6 +1,5 @@
 ﻿import { NextResponse } from 'next/server'
 import pool from '@/lib/db'
- 
 
 export async function GET() {
   try {
@@ -20,7 +19,7 @@ export async function GET() {
           '[]'::json
         ) as images
       FROM projects p
-      ORDER BY p.created_at DESC
+      ORDER BY p.sort_order ASC, p.created_at ASC
     `)
     return NextResponse.json(result.rows)
   } catch (error) {
@@ -32,9 +31,11 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const { image_url, title, description, video_url } = await request.json()
+    const countResult = await pool.query('SELECT COUNT(*) FROM projects')
+    const nextOrder = parseInt(countResult.rows[0].count, 10)
     const result = await pool.query(
-      'INSERT INTO projects (image_url, title, description, video_url) VALUES ($1, $2, $3, $4) RETURNING *',
-      [image_url, title, description, video_url]
+      'INSERT INTO projects (image_url, title, description, video_url, sort_order) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+      [image_url, title, description, video_url, nextOrder]
     )
     return NextResponse.json(result.rows[0])
   } catch {

@@ -33,12 +33,3 @@ export async function POST(
   )
   return NextResponse.json(result.rows[0])
 }
-
-export async function DELETE(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const { id } = await params // this is the image id, not project id
-  await pool.query('DELETE FROM project_images WHERE id = $1', [id])
-  return NextResponse.json({ success: true })
-}
