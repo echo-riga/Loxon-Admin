@@ -30,12 +30,12 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const { image_url, title, description, video_url } = await request.json()
+    const { image_url, title, description, video_url, project_type, constructed_date, location, client_name } = await request.json()
     const countResult = await pool.query('SELECT COUNT(*) FROM projects')
     const nextOrder = parseInt(countResult.rows[0].count, 10)
     const result = await pool.query(
-      'INSERT INTO projects (image_url, title, description, video_url, sort_order) VALUES ($1, $2, $3, $4, $5) RETURNING *',
-      [image_url, title, description, video_url, nextOrder]
+      'INSERT INTO projects (image_url, title, description, video_url, project_type, constructed_date, location, client_name, sort_order) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *',
+      [image_url, title, description, video_url, project_type || null, constructed_date || null, location || null, client_name || null, nextOrder]
     )
     return NextResponse.json(result.rows[0])
   } catch {

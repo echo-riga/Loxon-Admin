@@ -30,7 +30,7 @@ import dayjs, { Dayjs } from 'dayjs'
 
 // ========== Types ==========
 type Row = Record<string, unknown>
-interface Field { key: string; label: string; type?: 'text' | 'multiline' | 'select' | 'checkbox'; rows?: number; options?: string[] }
+interface Field { key: string; label: string; type?: 'text' | 'multiline' | 'select' | 'checkbox' | 'date'; rows?: number; options?: string[] }
 interface Section { id: string; label: string; endpoint: string; reorderEndpoint: string; fields: Field[]; columns: string[] }
 
 // ========== Config ==========
@@ -42,8 +42,12 @@ const SECTIONS: Section[] = [
       { key: 'image_url', label: 'Image URL' },
       { key: 'description', label: 'Description', type: 'multiline', rows: 3 },
       { key: 'video_url', label: 'Video URL' },
+      { key: 'project_type', label: 'Project Type' },
+      { key: 'constructed_date', label: 'Constructed Date', type: 'date' },
+      { key: 'location', label: 'Location' },
+      { key: 'client_name', label: 'Client Name' },
     ],
-    columns: ['title', 'image_url', 'description', 'video_url'],
+    columns: ['title', 'image_url', 'description', 'video_url', 'project_type', 'constructed_date', 'location', 'client_name'],
   },
   {
     id: 'products-services', label: 'Products & Services', endpoint: '/api/products-services', reorderEndpoint: '/api/products-services/reorder',
@@ -341,10 +345,10 @@ function ProjectImagesManager({ projectId }: { projectId: number }) {
 
 // ========== Sortable Table Row ==========
 function SortableTableRow({
-  row, columns, onEdit, onDelete, dragDisabled,
+  row, columns, fields, onEdit, onDelete, dragDisabled,
   expandable, expanded, onToggleExpand,
 }: {
-  row: Row; columns: string[]
+  row: Row; columns: string[]; fields: Field[]
   onEdit: (row: Row) => void; onDelete: (id: unknown) => void
   dragDisabled: boolean
   expandable?: boolean; expanded?: boolean; onToggleExpand?: (id: number) => void
@@ -366,11 +370,15 @@ function SortableTableRow({
           title={dragDisabled ? 'Clear search to reorder' : 'Drag to reorder'}
         >⠿</TableCell>
 
-        {columns.map(c => (
-          <TableCell key={c} sx={{ maxWidth: 220 }}>
-            {trunc(row[c])}
-          </TableCell>
-        ))}
+        {columns.map(c => {
+          const field = fields.find(f => f.key === c)
+          const isDate = field?.type === 'date'
+          return (
+            <TableCell key={c} sx={{ maxWidth: 220 }}>
+              {isDate ? fmtDate(row[c]) : trunc(row[c])}
+            </TableCell>
+          )
+        })}
 
         <TableCell>
           <IconButton size="small" color="primary" onClick={() => onEdit(row)}><Edit fontSize="small" /></IconButton>
@@ -504,6 +512,17 @@ function CrudSection({ section, expandable = false }: { section: Section; expand
         )
       case 'checkbox':
         return <FormControlLabel key={field.key} control={<Checkbox checked={!!value} onChange={e => handleChange(e.target.checked)} />} label={field.label} />
+      case 'date':
+        return (
+          <LocalizationProvider key={field.key} dateAdapter={AdapterDayjs}>
+            <DatePicker
+              label={field.label}
+              value={value ? dayjs(String(value)) : null}
+              onChange={v => handleChange(v ? v.format('YYYY-MM-DD') : '')}
+              slotProps={{ textField: { fullWidth: true } }}
+            />
+          </LocalizationProvider>
+        )
       default:
         return <TextField key={field.key} label={field.label} fullWidth value={value} onChange={e => handleChange(e.target.value)} />
     }
@@ -560,6 +579,7 @@ function CrudSection({ section, expandable = false }: { section: Section; expand
                       key={Number(row.id)}
                       row={row}
                       columns={section.columns}
+                      fields={section.fields}
                       onEdit={openEdit}
                       onDelete={remove}
                       dragDisabled={dragDisabled}

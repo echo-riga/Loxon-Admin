@@ -4,10 +4,10 @@ import pool from '@/lib/db'
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
-    const { image_url, title, description, video_url } = await request.json()
+    const { image_url, title, description, video_url, project_type, constructed_date, location, client_name } = await request.json()
     const result = await pool.query(
-      'UPDATE projects SET image_url=$1, title=$2, description=$3, video_url=$4 WHERE id=$5 RETURNING *',
-      [image_url, title, description, video_url, id]
+      'UPDATE projects SET image_url=$1, title=$2, description=$3, video_url=$4, project_type=$5, constructed_date=$6, location=$7, client_name=$8 WHERE id=$9 RETURNING *',
+      [image_url, title, description, video_url, project_type || null, constructed_date || null, location || null, client_name || null, id]
     )
     return NextResponse.json(result.rows[0])
   } catch {
