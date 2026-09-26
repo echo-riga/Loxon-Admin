@@ -34,3 +34,15 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+## Image uploads
+
+Admin image fields upload to Cloudinary through the server route at `/api/uploads/images`. Add these server-only values to `.env.local` or your deployment environment:
+
+```env
+CLOUDINARY_CLOUD_NAME=your-cloud-name
+CLOUDINARY_API_KEY=your-api-key
+CLOUDINARY_API_SECRET=your-api-secret
+```
+
+Restart the development server after changing environment variables. The app builds without these values; upload attempts return a clear configuration message until all three are present. Never expose `CLOUDINARY_API_SECRET` through a `NEXT_PUBLIC_` variable.
