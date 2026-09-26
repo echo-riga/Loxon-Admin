@@ -4,11 +4,7 @@ import { sendContactNotification } from '@/lib/email'
 
 export async function GET() {
   try {
-<<<<<<< HEAD
     const result = await pool.query('SELECT id, name, email, subject, message, inquiry_type, created_at FROM contact_submissions ORDER BY created_at DESC')
-=======
-    const result = await pool.query('SELECT id, name, email, subject, message, created_at FROM contact_submissions ORDER BY created_at DESC')
->>>>>>> cc7a495dfa3332e199faff98280e0acd7bde8747
     return NextResponse.json(result.rows)
   } catch {
     return NextResponse.json({ error: 'Failed to fetch' }, { status: 500 })
