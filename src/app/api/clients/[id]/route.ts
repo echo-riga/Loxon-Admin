@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import pool from '@/lib/db'
 import { requireAdmin } from '@/lib/admin-auth'
+import { oneOf, optionalHttpsUrl, optionalString, positiveInteger, readJsonObject, requiredString, validationResponse } from '@/lib/validation'
 
 export async function PUT(
   request: Request,
@@ -9,16 +10,25 @@ export async function PUT(
   const denied = await requireAdmin(request)
   if (denied) return denied
   try {
-    const { id } = await params
-    const { image_url, title, description, link, entity_type } = await request.json()
+    const { id: idText } = await params
+    const id = positiveInteger(idText, 'Client ID')
+    const body = await readJsonObject(request, 32 * 1024)
+    const image_url = optionalHttpsUrl(body, 'image_url', 'Image URL')
+    const title = requiredString(body, 'title', 'Company name', 160)
+    const description = optionalString(body, 'description', 'Description', 5_000)
+    const link = optionalHttpsUrl(body, 'link', 'Website link')
+    const entity_type = oneOf(body, 'entity_type', 'Entity type', ['partner', 'membership'] as const)
     const result = await pool.query(
       `UPDATE clients
        SET image_url = $1, title = $2, description = $3, link = $4, entity_type = $5
        WHERE id = $6 RETURNING *`,
       [image_url, title, description, link, entity_type, id]
     )
+    if (!result.rows[0]) return NextResponse.json({ error: 'Client not found.' }, { status: 404 })
     return NextResponse.json(result.rows[0])
-  } catch {
+  } catch (error) {
+    const invalid = validationResponse(error)
+    if (invalid) return invalid
     return NextResponse.json({ error: 'Failed to update' }, { status: 500 })
   }
 }
@@ -30,10 +40,14 @@ export async function DELETE(
   const denied = await requireAdmin(request)
   if (denied) return denied
   try {
-    const { id } = await params
-    await pool.query('DELETE FROM clients WHERE id = $1', [id])
+    const { id: idText } = await params
+    const id = positiveInteger(idText, 'Client ID')
+    const result = await pool.query('DELETE FROM clients WHERE id = $1', [id])
+    if (!result.rowCount) return NextResponse.json({ error: 'Client not found.' }, { status: 404 })
     return NextResponse.json({ success: true })
-  } catch {
+  } catch (error) {
+    const invalid = validationResponse(error)
+    if (invalid) return invalid
     return NextResponse.json({ error: 'Failed to delete' }, { status: 500 })
   }
 }

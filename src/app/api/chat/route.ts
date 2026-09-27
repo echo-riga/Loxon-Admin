@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { applyRateLimit, rateLimitIdentifier, rateLimits } from '@/lib/rate-limit'
+import { chatMessages, readJsonObject, validationResponse } from '@/lib/validation'
 
 async function buildSystemPrompt(request: Request) {
   const apiBase = new URL(request.url).origin
@@ -27,8 +28,7 @@ export async function POST(request: Request) {
     if (burstLimited) return burstLimited
     const hourlyLimited = await applyRateLimit(rateLimits.chatHourly, identifier, true)
     if (hourlyLimited) return hourlyLimited
-    const { messages } = await request.json()
-    if (!Array.isArray(messages) || messages.length === 0) return NextResponse.json({ error: 'Messages array is required' }, { status: 400 })
+    const messages = chatMessages(await readJsonObject(request, 24 * 1024))
     const apiKey = process.env.GROQ_API_KEY
     if (!apiKey) return NextResponse.json({ error: 'Chat service is not configured' }, { status: 500 })
 
@@ -41,6 +41,8 @@ export async function POST(request: Request) {
     const data = await response.json()
     return NextResponse.json({ reply: data?.choices?.[0]?.message?.content || 'Sorry, I could not generate a response.' })
   } catch (error) {
+    const invalid = validationResponse(error)
+    if (invalid) return invalid
     console.error('Chat API error:', error)
     return NextResponse.json({ error: 'Something went wrong' }, { status: 500 })
   }

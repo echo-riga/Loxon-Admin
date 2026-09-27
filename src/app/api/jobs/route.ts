@@ -1,6 +1,7 @@
 ﻿import { NextResponse } from 'next/server'
 import pool from '@/lib/db'
 import { requireAdmin } from '@/lib/admin-auth'
+import { optionalString, readJsonObject, requiredString, validationResponse } from '@/lib/validation'
  
 export async function GET() {
   try {
@@ -15,13 +16,17 @@ export async function POST(request: Request) {
   const denied = await requireAdmin(request)
   if (denied) return denied
   try {
-    const { title, description } = await request.json()
+    const body = await readJsonObject(request, 24 * 1024)
+    const title = requiredString(body, 'title', 'Job title', 160)
+    const description = optionalString(body, 'description', 'Description', 10_000)
     const result = await pool.query(
       'INSERT INTO jobs (title, description) VALUES ($1, $2) RETURNING *',
       [title, description]
     )
     return NextResponse.json(result.rows[0])
-  } catch {
+  } catch (error) {
+    const invalid = validationResponse(error)
+    if (invalid) return invalid
     return NextResponse.json({ error: 'Failed to create' }, { status: 500 })
   }
 }

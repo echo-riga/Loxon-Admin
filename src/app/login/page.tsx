@@ -44,8 +44,8 @@ function LoginForm() {
       </Box>
       <Box component={'form'} onSubmit={submit} sx={{ display: 'grid', gap: 2 }}>
         {error && <Alert severity={'error'}>{error}</Alert>}
-        <TextField label={'Email'} type={'email'} value={email} onChange={event => setEmail(event.target.value)} autoComplete={'username'} required autoFocus />
-        <TextField label={'Password'} type={'password'} value={password} onChange={event => setPassword(event.target.value)} autoComplete={'current-password'} required />
+        <TextField label={'Email'} type={'email'} value={email} onChange={event => setEmail(event.target.value)} autoComplete={'username'} slotProps={{ inputLabel: { shrink: true }, htmlInput: { maxLength: 254 } }} required autoFocus />
+        <TextField label={'Password'} type={'password'} value={password} onChange={event => setPassword(event.target.value)} autoComplete={'current-password'} slotProps={{ inputLabel: { shrink: true }, htmlInput: { maxLength: 256 } }} required />
         <Button type={'submit'} variant={'contained'} size={'large'} disabled={loading} sx={{ minHeight: 46 }}>
           {loading ? <CircularProgress size={22} color={'inherit'} /> : 'Sign in'}
         </Button>

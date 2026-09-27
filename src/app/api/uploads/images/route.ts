@@ -12,6 +12,10 @@ export async function POST(request: Request) {
   try {
     const denied = await requireAdmin(request)
     if (denied) return denied
+    const declaredLength = Number(request.headers.get('content-length') || 0)
+    if (declaredLength > MAX_IMAGE_BYTES + 1024 * 1024) {
+      return NextResponse.json({ error: 'Image upload payload must not exceed 9 MB.' }, { status: 413 })
+    }
     const session = await getAdminFromRequest(request)
     const limited = await applyRateLimit(rateLimits.upload, rateLimitIdentifier(request, 'upload', session?.email || ''), true)
     if (limited) return limited

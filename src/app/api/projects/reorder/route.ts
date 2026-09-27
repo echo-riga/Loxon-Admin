@@ -1,21 +1,24 @@
 import { NextResponse } from 'next/server'
 import pool from '@/lib/db'
 import { requireAdmin } from '@/lib/admin-auth'
+import { ValidationError, positiveInteger, readJsonObject, validationResponse } from '@/lib/validation'
 
 export async function PUT(request: Request) {
   const denied = await requireAdmin(request)
   if (denied) return denied
 
-  const body = await request.json()
-  const { orderedIds } = body
-
-  if (
-    !Array.isArray(orderedIds) ||
-    orderedIds.length === 0 ||
-    orderedIds.some((id) => !Number.isInteger(id) || id <= 0) ||
-    new Set(orderedIds).size !== orderedIds.length
-  ) {
-    return NextResponse.json({ error: 'Invalid orderedIds' }, { status: 400 })
+  let orderedIds: number[]
+  try {
+    const body = await readJsonObject(request, 16 * 1024)
+    if (!Array.isArray(body.orderedIds) || body.orderedIds.length === 0 || body.orderedIds.length > 1_000) {
+      throw new ValidationError('Ordered project IDs must be a non-empty array with at most 1,000 items.')
+    }
+    orderedIds = body.orderedIds.map(id => positiveInteger(id, 'Project ID'))
+    if (new Set(orderedIds).size !== orderedIds.length) throw new ValidationError('Ordered project IDs must not contain duplicates.')
+  } catch (error) {
+    const invalid = validationResponse(error)
+    if (invalid) return invalid
+    return NextResponse.json({ error: 'Invalid reorder request.' }, { status: 400 })
   }
 
   const client = await pool.connect()
