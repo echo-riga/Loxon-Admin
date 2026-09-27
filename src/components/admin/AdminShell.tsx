@@ -15,7 +15,7 @@ export default function AdminShell() {
   }
 
   return (
-    <Box>
+    <Box sx={{ '& .MuiAppBar-root > .MuiToolbar-root': { pr: { xs: '118px', sm: '132px' } } }}>
       <Box sx={{ position: 'fixed', top: 14, right: 18, zIndex: 1300 }}>
         <Button variant={'outlined'} color={'inherit'} size={'small'} startIcon={<Logout />} onClick={() => void logout()} sx={{ bgcolor: 'background.paper' }}>
           Sign out
