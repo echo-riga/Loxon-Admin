@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import pool from '@/lib/db'
+import { requireAdmin } from '@/lib/admin-auth'
 
 export async function GET(
   request: Request,
@@ -20,6 +21,8 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const denied = await requireAdmin(request)
+  if (denied) return denied
   const { id } = await params
   const { image_url, caption } = await request.json()
   if (!image_url) {

@@ -1,7 +1,10 @@
 ﻿import { NextResponse } from 'next/server'
 import pool from '@/lib/db'
+import { requireAdmin } from '@/lib/admin-auth'
  
-export async function GET() {
+export async function GET(request: Request) {
+  const denied = await requireAdmin(request)
+  if (denied) return denied
   if (!process.env.DATABASE_URL) {
     return NextResponse.json({ error: 'DATABASE_URL is not set' }, { status: 500 })
   }

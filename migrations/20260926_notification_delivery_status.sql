@@ -1,0 +1,13 @@
+BEGIN;
+ALTER TABLE contact_submissions ADD COLUMN IF NOT EXISTS notification_status varchar;
+ALTER TABLE contact_submissions ADD COLUMN IF NOT EXISTS notification_error text;
+UPDATE contact_submissions SET notification_status = 'unknown' WHERE notification_status IS NULL;
+ALTER TABLE contact_submissions ALTER COLUMN notification_status SET DEFAULT 'pending';
+ALTER TABLE contact_submissions ALTER COLUMN notification_status SET NOT NULL;
+ALTER TABLE contact_submissions DROP COLUMN IF EXISTS inquiry_type;
+ALTER TABLE job_applications ADD COLUMN IF NOT EXISTS notification_status varchar;
+ALTER TABLE job_applications ADD COLUMN IF NOT EXISTS notification_error text;
+UPDATE job_applications SET notification_status = 'unknown' WHERE notification_status IS NULL;
+ALTER TABLE job_applications ALTER COLUMN notification_status SET DEFAULT 'pending';
+ALTER TABLE job_applications ALTER COLUMN notification_status SET NOT NULL;
+COMMIT;

@@ -19,6 +19,8 @@
     "@mui/material": "^9.0.0",
     "@mui/material-nextjs": "^9.0.0",
     "@mui/x-date-pickers": "^9.3.0",
+    "@upstash/ratelimit": "^2.2.0",
+    "@upstash/redis": "^1.39.0",
     "dayjs": "^1.11.20",
     "next": "16.2.4",
     "pg": "^8.20.0",

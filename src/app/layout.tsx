@@ -6,8 +6,8 @@ import ThemeRegistry from '@/lib/registry'
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' })
 
 export const metadata: Metadata = {
-  title: 'Loxon Philippines Inc. | Engineering & Construction Excellence',
-  description: 'Premier engineering and construction company in the Philippines since 1998.',
+  title: 'Loxon Admin',
+  description: 'Secure content administration for Loxon Philippines Inc.',
 }
 
 export default function RootLayout({

@@ -1,5 +1,6 @@
 ﻿import { NextResponse } from 'next/server'
 import pool from '@/lib/db'
+import { requireAdmin } from '@/lib/admin-auth'
 
 export async function GET() {
   try {
@@ -29,6 +30,8 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const denied = await requireAdmin(request)
+  if (denied) return denied
   try {
     const { image_url, title, description, video_url, project_type, constructed_date, location, client_name } = await request.json()
     const countResult = await pool.query('SELECT COUNT(*) FROM projects')

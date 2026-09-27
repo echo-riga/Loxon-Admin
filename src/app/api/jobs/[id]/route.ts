@@ -1,7 +1,10 @@
 import { NextResponse } from 'next/server'
 import pool from '@/lib/db'
+import { requireAdmin } from '@/lib/admin-auth'
  
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const denied = await requireAdmin(request)
+  if (denied) return denied
   try {
     const { id } = await params
     const { title, description } = await request.json()
@@ -15,7 +18,9 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   }
 }
  
-export async function DELETE(_: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const denied = await requireAdmin(request)
+  if (denied) return denied
   try {
     const { id } = await params
     await pool.query('DELETE FROM jobs WHERE id=$1', [id])

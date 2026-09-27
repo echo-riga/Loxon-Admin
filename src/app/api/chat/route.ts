@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server'
+import { applyRateLimit, rateLimitIdentifier, rateLimits } from '@/lib/rate-limit'
 
 async function buildSystemPrompt(request: Request) {
   const apiBase = new URL(request.url).origin
-  const [projectsResult, servicesResult, companyResult] = await Promise.allSettled([
-    fetch(`${apiBase}/api/projects`, { cache: 'no-store' }),
-    fetch(`${apiBase}/api/products-services`, { cache: 'no-store' }),
-    fetch(`${apiBase}/api/our-company`, { cache: 'no-store' }),
+  const [projectsResult, servicesResult] = await Promise.allSettled([
+    fetch(`${apiBase}/api/projects`, { next: { revalidate: 60 } }),
+    fetch(`${apiBase}/api/products-services`, { next: { revalidate: 60 } }),
   ])
 
   const context: string[] = []
@@ -17,16 +17,16 @@ async function buildSystemPrompt(request: Request) {
     const services = await servicesResult.value.json()
     context.push(...services.map((service: { title: string }) => `Service: ${service.title}`))
   }
-  if (companyResult.status === 'fulfilled' && companyResult.value.ok) {
-    const company = await companyResult.value.json()
-    if (company.description) context.push(`Company description: ${String(company.description).slice(0, 500)}`)
-  }
-
   return `You are the customer service assistant for Loxon Philippines Inc., an engineering and construction firm. Be professional, concise, and only answer Loxon-related questions. For quotes or new projects, direct visitors to /contact. For careers, direct them to /join-us. For safety-critical service concerns, ask them to contact Loxon directly. Do not invent facts.\n\nCurrent Loxon data:\n${context.join('\n')}`
 }
 
 export async function POST(request: Request) {
   try {
+    const identifier = rateLimitIdentifier(request, 'chat')
+    const burstLimited = await applyRateLimit(rateLimits.chatBurst, identifier, true)
+    if (burstLimited) return burstLimited
+    const hourlyLimited = await applyRateLimit(rateLimits.chatHourly, identifier, true)
+    if (hourlyLimited) return hourlyLimited
     const { messages } = await request.json()
     if (!Array.isArray(messages) || messages.length === 0) return NextResponse.json({ error: 'Messages array is required' }, { status: 400 })
     const apiKey = process.env.GROQ_API_KEY

@@ -46,3 +46,9 @@ CLOUDINARY_API_SECRET=your-api-secret
 ```
 
 Restart the development server after changing environment variables. The app builds without these values; upload attempts return a clear configuration message until all three are present. Never expose `CLOUDINARY_API_SECRET` through a `NEXT_PUBLIC_` variable.
+
+## Admin security
+
+The dashboard requires an eight-hour signed login session. API mutations, uploads, and private submission lists require that session. Public forms, login, uploads, and chat are rate-limited through Upstash Redis.
+
+Copy every value from `.env.example` into `.env.local` for development and into the matching Vercel project environments for deployment. Password hashes, session secrets, Redis tokens, database credentials, Cloudinary secrets, Resend keys, and Groq keys must remain server-only. Set `ALLOWED_ORIGINS` to exact comma-separated URLs without paths.

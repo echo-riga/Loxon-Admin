@@ -1,5 +1,7 @@
 import { createHash } from 'node:crypto'
 import { NextResponse } from 'next/server'
+import { getAdminFromRequest, requireAdmin } from '@/lib/admin-auth'
+import { applyRateLimit, rateLimitIdentifier, rateLimits } from '@/lib/rate-limit'
 
 export const runtime = 'nodejs'
 
@@ -8,6 +10,11 @@ const ALLOWED_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/g
 
 export async function POST(request: Request) {
   try {
+    const denied = await requireAdmin(request)
+    if (denied) return denied
+    const session = await getAdminFromRequest(request)
+    const limited = await applyRateLimit(rateLimits.upload, rateLimitIdentifier(request, 'upload', session?.email || ''), true)
+    if (limited) return limited
     const cloudName = process.env.CLOUDINARY_CLOUD_NAME
     const apiKey = process.env.CLOUDINARY_API_KEY
     const apiSecret = process.env.CLOUDINARY_API_SECRET
