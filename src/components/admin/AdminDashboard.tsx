@@ -1,7 +1,7 @@
 'use client'
 /* eslint-disable react-hooks/set-state-in-effect, react-hooks/refs */
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Alert, AppBar, Box, Button, Chip, CircularProgress, Collapse, Container, Dialog, DialogActions,
   DialogContent, DialogTitle, IconButton, InputAdornment, MenuItem, Paper, Snackbar, Tab, Table,
@@ -146,6 +146,8 @@ function FormDateField({ field, value, onChange }: { field: Field; value: unknow
 }
 
 function CrudSection({ section, project = false }: { section: Section; project?: boolean }) {
+  const reorderPending = useRef(false)
+  const [reordering, setReordering] = useState(false)
   const [rows, setRows] = useState<Row[]>([]); const [loading, setLoading] = useState(true); const [error, setError] = useState('')
   const [search, setSearch] = useState(''); const [filters, setFilters] = useState<Record<string, string>>({}); const [page, setPage] = useState(0); const [perPage, setPerPage] = useState(10)
   const [open, setOpen] = useState(false); const [editing, setEditing] = useState<Row | null>(null); const [form, setForm] = useState<Row>({}); const [expanded, setExpanded] = useState<number | null>(null)
@@ -163,15 +165,38 @@ function CrudSection({ section, project = false }: { section: Section; project?:
     return true
   }), [rows, search, filters, section])
   const active = Boolean(search.trim() || Object.values(filters).some(Boolean)); const paged = filtered.slice(page * perPage, page * perPage + perPage)
-  const canReorder = project && !active && page === 0 && perPage >= rows.length
+  const canReorder = project && !reordering && !active && page === 0 && perPage >= rows.length
   const openForm = (row?: Row) => { setEditing(row || null); setForm(row ? editFormValues(row, section.fields.filter(field => field.type === 'date').map(field => field.key)) : {}); setOpen(true) }
   const save = async () => { try { const response = await fetch(editing ? `${section.endpoint}/${editing.id}` : section.endpoint, { method: editing ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) }); if (!response.ok) throw new Error(await apiError(response)); setOpen(false); setNotice({ open: true, message: `${section.singular[0].toUpperCase()}${section.singular.slice(1)} ${editing ? 'updated' : 'added'}.`, severity: 'success' }); await load() } catch (cause) { setNotice({ open: true, message: cause instanceof Error ? cause.message : 'Unable to save.', severity: 'error' }) } }
   const remove = async (row: Row) => { if (!confirm(`Delete “${String(row.title || 'this record')}”?`)) return; const response = await fetch(`${section.endpoint}/${row.id}`, { method: 'DELETE' }); if (!response.ok) return setNotice({ open: true, message: await apiError(response), severity: 'error' }); setNotice({ open: true, message: 'Record deleted.', severity: 'success' }); await load() }
-  const onDragEnd = async ({ active: source, over }: DragEndEvent) => { if (!canReorder || !over || source.id === over.id) return; const oldIndex = rows.findIndex(row => Number(row.id) === source.id), newIndex = rows.findIndex(row => Number(row.id) === over.id); const reordered = arrayMove(rows, oldIndex, newIndex); setRows(reordered); const response = await fetch('/api/projects/reorder', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ orderedIds: reordered.map(row => row.id) }) }); if (!response.ok) { setNotice({ open: true, message: await apiError(response), severity: 'error' }); await load() } }
+  const onDragEnd = async ({ active: source, over }: DragEndEvent) => {
+    if (!canReorder || reorderPending.current || !over || source.id === over.id) return
+    const oldIndex = rows.findIndex(row => Number(row.id) === source.id)
+    const newIndex = rows.findIndex(row => Number(row.id) === over.id)
+    if (oldIndex < 0 || newIndex < 0) return
+    const previousRows = rows
+    const reordered = arrayMove(rows, oldIndex, newIndex)
+    reorderPending.current = true
+    setReordering(true)
+    setRows(reordered)
+    try {
+      const response = await fetch('/api/projects/reorder', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ orderedIds: reordered.map(row => row.id) }) })
+      if (!response.ok) throw new Error(await apiError(response))
+      setNotice({ open: true, message: 'Project order saved.', severity: 'success' })
+    } catch (cause) {
+      setRows(previousRows)
+      setNotice({ open: true, message: cause instanceof Error ? cause.message : 'Unable to save project order.', severity: 'error' })
+      // A connection can fail after the server saved; read its actual order when possible.
+      await load()
+    } finally {
+      reorderPending.current = false
+      setReordering(false)
+    }
+  }
   const renderField = (field: Field) => field.type === 'image' ? <ImageUploadField key={field.key} label={field.label} value={String(form[field.key] || '')} onChange={value => setForm(previous => ({ ...previous, [field.key]: value }))} /> : field.type === 'select' ? <TextField key={field.key} select label={field.label} value={String(form[field.key] || '')} onChange={event => setForm(previous => ({ ...previous, [field.key]: event.target.value }))}>{field.options?.map(option => <MenuItem key={option} value={option}>{labelFor(option)}</MenuItem>)}</TextField> : field.type === 'date' ? <FormDateField key={field.key} field={field} value={form[field.key]} onChange={value => setForm(previous => ({ ...previous, [field.key]: value }))} /> : <TextField key={field.key} required={field.required} type={'text'} label={field.label} multiline={field.type === 'multiline'} minRows={field.type === 'multiline' ? 3 : undefined} value={String(form[field.key] || '')} onChange={event => setForm(previous => ({ ...previous, [field.key]: event.target.value }))} />
   return <SectionShell title={section.label} count={rows.length} action={<Button variant="contained" startIcon={<Add />} onClick={() => openForm()}>Add {section.singular}</Button>}>
     <FilterToolbar search={search} onSearch={setSearch} active={active} onClear={() => { setSearch(''); setFilters({}) }} count={filtered.length} total={rows.length} onExport={() => exportCsv(filtered, section.id)}>{section.id === 'projects' && <><FilterSelect label="Project type" value={filters.type} options={values('project_type')} onChange={value => setFilters(current => ({ ...current, type: value }))} /><FilterSelect label="Location" value={filters.location} options={values('location')} onChange={value => setFilters(current => ({ ...current, location: value }))} /><FilterSelect label="Year" value={filters.year} options={[...new Set(rows.map(row => dayjs(String(row.constructed_date)).isValid() ? dayjs(String(row.constructed_date)).format('YYYY') : '').filter(Boolean))].sort().reverse()} onChange={value => setFilters(current => ({ ...current, year: value }))} /></>}{section.id === 'products-services' && <FilterSelect label="Media" value={filters.media} options={['image', 'video', 'both', 'none']} onChange={value => setFilters(current => ({ ...current, media: value }))} />}{section.id === 'clients' && <><FilterSelect label="Entity type" value={filters.entity} options={values('entity_type')} onChange={value => setFilters(current => ({ ...current, entity: value }))} /><FilterSelect label="Image" value={filters.image} options={['yes', 'no']} onChange={value => setFilters(current => ({ ...current, image: value }))} /><FilterSelect label="Link" value={filters.link} options={['yes', 'no']} onChange={value => setFilters(current => ({ ...current, link: value }))} /></>}</FilterToolbar>
-    {project && !canReorder && <Alert severity="info" sx={{ mb: 2 }}>To reorder projects, clear filters, go to the first page, and show all {rows.length} records.</Alert>}
+    {project && !canReorder && <Alert severity="info" sx={{ mb: 2 }}>{reordering ? 'Saving project order…' : `To reorder projects, clear filters, go to the first page, and show all ${rows.length} records.`}</Alert>}
     {error ? <Alert severity="error" action={<Button onClick={() => void load()}>Retry</Button>}>{error}</Alert> : loading ? <LoadingState /> : <>
       <Typography variant="caption" color="text.secondary" sx={{ display: { xs: 'block', sm: 'none' }, mb: 0.75 }}>
         Swipe horizontally to view every column and row action.
@@ -209,6 +234,7 @@ function SectionShell({ title, count, action, children }: { title: string; count
 
 function DateFilters({ from, to, setFrom, setTo }: { from: Dayjs | null; to: Dayjs | null; setFrom: (value: Dayjs | null) => void; setTo: (value: Dayjs | null) => void }) { return <LocalizationProvider dateAdapter={AdapterDayjs}><DatePicker label="From" value={from} onChange={setFrom} slotProps={{ textField: { sx: { width: { xs: 'calc(50% - 6px)', sm: 150 } } } }} /><DatePicker label="To" value={to} onChange={setTo} slotProps={{ textField: { sx: { width: { xs: 'calc(50% - 6px)', sm: 150 } } } }} /></LocalizationProvider> }
 function ReadOnlySection({ kind }: { kind: 'contacts' | 'applications' }) {
+  const [selectedSubmission, setSelectedSubmission] = useState<Row | null>(null)
   const isContact = kind === 'contacts'; const endpoint = isContact ? '/api/contact-submissions' : '/api/job-applications'; const title = isContact ? 'Contact Submissions' : 'Job Applications'
   const [rows, setRows] = useState<Row[]>([]); const [loading, setLoading] = useState(true); const [error, setError] = useState(''); const [search, setSearch] = useState(''); const [from, setFrom] = useState<Dayjs | null>(null); const [to, setTo] = useState<Dayjs | null>(null); const [category, setCategory] = useState(''); const [resume, setResume] = useState(''); const [page, setPage] = useState(0); const [perPage, setPerPage] = useState(10)
   const load = useCallback(async () => { setLoading(true); setError(''); try { const response = await fetch(endpoint); if (!response.ok) throw new Error(await apiError(response)); const body = await response.json(); setRows(Array.isArray(body) ? body : []) } catch (cause) { setError(cause instanceof Error ? cause.message : 'Unable to load submissions.') } finally { setLoading(false) } }, [endpoint])
@@ -219,7 +245,19 @@ function ReadOnlySection({ kind }: { kind: 'contacts' | 'applications' }) {
   const active = Boolean(search.trim() || from || to || category || resume); const paged = filtered.slice(page * perPage, page * perPage + perPage)
   const columns = isContact ? ['name', 'email', 'subject', 'message', 'notification_status', 'notification_error', 'created_at'] : ['full_name', 'email', 'phone', 'job_title', 'cover_letter', 'resume_url', 'notification_status', 'notification_error', 'created_at']
   return <SectionShell title={title} count={rows.length}><FilterToolbar search={search} onSearch={setSearch} active={active} onClear={() => { setSearch(''); setFrom(null); setTo(null); setCategory(''); setResume('') }} count={filtered.length} total={rows.length} onExport={() => exportCsv(filtered, kind)}><DateFilters from={from} to={to} setFrom={setFrom} setTo={setTo} />{!isContact && <><FilterSelect label="Job title" value={category} options={categories} onChange={setCategory} /><FilterSelect label="Resume" value={resume} options={['yes', 'no']} onChange={setResume} /></>}</FilterToolbar>
-    {error ? <Alert severity="error" action={<Button onClick={() => void load()}>Retry</Button>}>{error}</Alert> : loading ? <LoadingState /> : <><TableContainer component={Paper} variant="outlined" sx={{ overflowX: 'auto', borderRadius: 2.5 }}><Table stickyHeader size="small" sx={{ minWidth: isContact ? 1000 : 1160 }}><TableHead><TableRow>{columns.map(column => <HeaderCell key={column}>{labelFor(column === 'created_at' ? 'date received' : column)}</HeaderCell>)}</TableRow></TableHead><TableBody>{paged.length ? paged.map(row => <TableRow key={String(row.id)} hover>{columns.map(column => column === 'created_at' ? <TableCell key={column} sx={{ whiteSpace: 'nowrap' }}>{formatDate(row[column])}</TableCell> : column === 'resume_url' ? <TableCell key={column}>{hasValue(row[column]) ? <Button component="a" href={String(row[column])} target="_blank" rel="noreferrer" size="small">View resume</Button> : '—'}</TableCell> : <DataCell key={column} column={column === 'message' || column === 'cover_letter' ? 'description' : column} value={row[column]} row={row} />)}</TableRow>) : <EmptyRow columns={columns.length} filtered={active} message={active ? undefined : `No ${isContact ? 'contact submissions' : 'job applications'} yet`} />}</TableBody></Table></TableContainer><ResponsivePagination count={filtered.length} page={page} perPage={perPage} setPage={setPage} setPerPage={setPerPage} /></>}
+    {error ? <Alert severity="error" action={<Button onClick={() => void load()}>Retry</Button>}>{error}</Alert> : loading ? <LoadingState /> : <><TableContainer component={Paper} variant="outlined" sx={{ overflowX: 'auto', borderRadius: 2.5 }}><Table stickyHeader size="small" sx={{ minWidth: isContact ? 1000 : 1160 }}><TableHead><TableRow>{columns.map(column => <HeaderCell key={column}>{labelFor(column === 'created_at' ? 'date received' : column)}</HeaderCell>)}<HeaderCell>Details</HeaderCell></TableRow></TableHead><TableBody>{paged.length ? paged.map(row => <TableRow key={String(row.id)} hover>{columns.map(column => column === 'created_at' ? <TableCell key={column} sx={{ whiteSpace: 'nowrap' }}>{formatDate(row[column])}</TableCell> : column === 'resume_url' ? <TableCell key={column}>{hasValue(row[column]) ? <Button component="a" href={String(row[column])} target="_blank" rel="noreferrer" size="small">View resume</Button> : '—'}</TableCell> : <DataCell key={column} column={column === 'message' || column === 'cover_letter' ? 'description' : column} value={row[column]} row={row} />)}<TableCell><Button size="small" onClick={() => setSelectedSubmission(row)}>View full</Button></TableCell></TableRow>) : <EmptyRow columns={columns.length + 1} filtered={active} message={active ? undefined : `No ${isContact ? 'contact submissions' : 'job applications'} yet`} />}</TableBody></Table></TableContainer><ResponsivePagination count={filtered.length} page={page} perPage={perPage} setPage={setPage} setPerPage={setPerPage} /></>}
+    <Dialog open={selectedSubmission !== null} onClose={() => setSelectedSubmission(null)} fullWidth maxWidth="md" aria-labelledby="submission-details-title">
+      <DialogTitle id="submission-details-title">{isContact ? 'Contact submission' : 'Job application'}</DialogTitle>
+      <DialogContent dividers sx={{ display: 'grid', gap: 2.5 }}>
+        {selectedSubmission && columns.map(column => (
+          <Box key={column}>
+            <Typography variant="subtitle2" color="text.secondary" gutterBottom>{labelFor(column === 'created_at' ? 'date received' : column)}</Typography>
+            <Typography component="div" sx={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', userSelect: 'text' }}>{column === 'created_at' ? formatDate(selectedSubmission[column]) : String(selectedSubmission[column] ?? '') || '\u2014'}</Typography>
+          </Box>
+        ))}
+      </DialogContent>
+      <DialogActions><Button onClick={() => setSelectedSubmission(null)}>Close</Button></DialogActions>
+    </Dialog>
   </SectionShell>
 }
 
