@@ -1,9 +1,10 @@
 ﻿import { NextResponse } from 'next/server'
 import pool from '@/lib/db'
+import { publicContentResponse } from '@/lib/public-content-response'
 import { requireAdmin } from '@/lib/admin-auth'
 import { optionalDate, optionalHttpsUrl, optionalString, readJsonObject, requiredString, validationResponse } from '@/lib/validation'
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const result = await pool.query(`
       SELECT 
@@ -23,7 +24,7 @@ export async function GET() {
       FROM projects p
       ORDER BY p.sort_order ASC, p.created_at ASC
     `)
-    return NextResponse.json(result.rows)
+    return publicContentResponse(request, result.rows)
   } catch (error) {
     console.error(error)
     return NextResponse.json({ error: 'Failed to fetch projects' }, { status: 500 })

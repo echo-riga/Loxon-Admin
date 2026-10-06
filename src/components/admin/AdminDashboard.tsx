@@ -20,6 +20,7 @@ import { DndContext, DragEndEvent, PointerSensor, closestCenter, useSensor, useS
 import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import ImageUploadField from './ImageUploadField'
+import { editFormValues } from '@/lib/edit-form'
 
 type Row = Record<string, unknown>
 type Field = { key: string; label: string; type?: 'text' | 'multiline' | 'select' | 'date' | 'image'; options?: string[]; required?: boolean }
@@ -99,7 +100,7 @@ function ResponsivePagination({ count, page, perPage, setPage, setPerPage }: { c
 function ProjectImages({ projectId }: { projectId: number }) {
   const [rows, setRows] = useState<Row[]>([]); const [loading, setLoading] = useState(true); const [open, setOpen] = useState(false)
   const [url, setUrl] = useState(''); const [caption, setCaption] = useState(''); const [notice, setNotice] = useState<Notice>({ open: false, message: '', severity: 'success' })
-  const load = useCallback(async () => { setLoading(true); try { const response = await fetch(`/api/projects/${projectId}/images`); if (!response.ok) throw new Error(await apiError(response)); const body = await response.json(); setRows(Array.isArray(body) ? body : []) } catch (error) { setNotice({ open: true, message: error instanceof Error ? error.message : 'Unable to load images.', severity: 'error' }) } finally { setLoading(false) } }, [projectId])
+  const load = useCallback(async () => { setLoading(true); try { const response = await fetch(`/api/projects/${projectId}/images?fresh=1`); if (!response.ok) throw new Error(await apiError(response)); const body = await response.json(); setRows(Array.isArray(body) ? body : []) } catch (error) { setNotice({ open: true, message: error instanceof Error ? error.message : 'Unable to load images.', severity: 'error' }) } finally { setLoading(false) } }, [projectId])
   useEffect(() => { void load() }, [load])
   const add = async () => { if (!url) return; try { const response = await fetch(`/api/projects/${projectId}/images`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ image_url: url, caption }) }); if (!response.ok) throw new Error(await apiError(response)); setOpen(false); setUrl(''); setCaption(''); await load() } catch (error) { setNotice({ open: true, message: error instanceof Error ? error.message : 'Unable to add image.', severity: 'error' }) } }
   const remove = async (id: unknown) => { if (!confirm('Delete this project image?')) return; const response = await fetch(`/api/projects/${projectId}/images/${id}`, { method: 'DELETE' }); if (!response.ok) return setNotice({ open: true, message: await apiError(response), severity: 'error' }); await load() }
@@ -149,7 +150,7 @@ function CrudSection({ section, project = false }: { section: Section; project?:
   const [search, setSearch] = useState(''); const [filters, setFilters] = useState<Record<string, string>>({}); const [page, setPage] = useState(0); const [perPage, setPerPage] = useState(10)
   const [open, setOpen] = useState(false); const [editing, setEditing] = useState<Row | null>(null); const [form, setForm] = useState<Row>({}); const [expanded, setExpanded] = useState<number | null>(null)
   const [notice, setNotice] = useState<Notice>({ open: false, message: '', severity: 'success' }); const sensors = useSensors(useSensor(PointerSensor))
-  const load = useCallback(async () => { setLoading(true); setError(''); try { const response = await fetch(section.endpoint); if (!response.ok) throw new Error(await apiError(response)); const body = await response.json(); setRows(Array.isArray(body) ? body : []) } catch (cause) { setRows([]); setError(cause instanceof Error ? cause.message : 'Unable to load records.') } finally { setLoading(false) } }, [section.endpoint])
+  const load = useCallback(async () => { setLoading(true); setError(''); try { const response = await fetch(`${section.endpoint}?fresh=1`); if (!response.ok) throw new Error(await apiError(response)); const body = await response.json(); setRows(Array.isArray(body) ? body : []) } catch (cause) { setRows([]); setError(cause instanceof Error ? cause.message : 'Unable to load records.') } finally { setLoading(false) } }, [section.endpoint])
   useEffect(() => { void load() }, [load])
   useEffect(() => { setPage(0) }, [search, filters])
   useEffect(() => { const last = Math.max(0, Math.ceil(rows.length / perPage) - 1); setPage(value => Math.min(value, last)) }, [rows.length, perPage])
@@ -163,7 +164,7 @@ function CrudSection({ section, project = false }: { section: Section; project?:
   }), [rows, search, filters, section])
   const active = Boolean(search.trim() || Object.values(filters).some(Boolean)); const paged = filtered.slice(page * perPage, page * perPage + perPage)
   const canReorder = project && !active && page === 0 && perPage >= rows.length
-  const openForm = (row?: Row) => { setEditing(row || null); setForm(row ? { ...row } : {}); setOpen(true) }
+  const openForm = (row?: Row) => { setEditing(row || null); setForm(row ? editFormValues(row, section.fields.filter(field => field.type === 'date').map(field => field.key)) : {}); setOpen(true) }
   const save = async () => { try { const response = await fetch(editing ? `${section.endpoint}/${editing.id}` : section.endpoint, { method: editing ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) }); if (!response.ok) throw new Error(await apiError(response)); setOpen(false); setNotice({ open: true, message: `${section.singular[0].toUpperCase()}${section.singular.slice(1)} ${editing ? 'updated' : 'added'}.`, severity: 'success' }); await load() } catch (cause) { setNotice({ open: true, message: cause instanceof Error ? cause.message : 'Unable to save.', severity: 'error' }) } }
   const remove = async (row: Row) => { if (!confirm(`Delete “${String(row.title || 'this record')}”?`)) return; const response = await fetch(`${section.endpoint}/${row.id}`, { method: 'DELETE' }); if (!response.ok) return setNotice({ open: true, message: await apiError(response), severity: 'error' }); setNotice({ open: true, message: 'Record deleted.', severity: 'success' }); await load() }
   const onDragEnd = async ({ active: source, over }: DragEndEvent) => { if (!canReorder || !over || source.id === over.id) return; const oldIndex = rows.findIndex(row => Number(row.id) === source.id), newIndex = rows.findIndex(row => Number(row.id) === over.id); const reordered = arrayMove(rows, oldIndex, newIndex); setRows(reordered); const response = await fetch('/api/projects/reorder', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ orderedIds: reordered.map(row => row.id) }) }); if (!response.ok) { setNotice({ open: true, message: await apiError(response), severity: 'error' }); await load() } }

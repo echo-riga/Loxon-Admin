@@ -52,3 +52,11 @@ Restart the development server after changing environment variables. The app bui
 The dashboard requires an eight-hour signed login session. API mutations, uploads, and private submission lists require that session. Public forms, login, uploads, and chat are rate-limited through Upstash Redis.
 
 Copy every value from `.env.example` into `.env.local` for development and into the matching Vercel project environments for deployment. Password hashes, session secrets, Redis tokens, database credentials, Cloudinary secrets, Resend keys, and Groq keys must remain server-only. Set `ALLOWED_ORIGINS` to exact comma-separated URLs without paths.
+
+## Public content CDN cache
+
+Successful GET responses for projects, project images, products/services, clients (including memberships and partners), and jobs are cached by Vercel's CDN for 60 seconds. Browser responses use `max-age=0, must-revalidate` so visitors check the server rather than reuse a fresh browser cache. CORS responses vary by `Origin`. No extra stale-while-revalidate window is configured.
+
+Dashboard collection requests use `?fresh=1`, which returns `no-store` responses and bypasses the public CDN cache so edits are visible immediately in Admin. Public content may reflect edits after its existing CDN entry expires. Error responses, private submission lists, authentication, uploads, and POST/PUT/DELETE operations do not receive the public cache policy.
+
+Redeploy Admin on Vercel to activate these headers. After deployment, repeat a public GET with the same Origin and inspect `x-vercel-cache` for `HIT` and `age` for its cache age. Local development verifies the headers but does not provide a Vercel CDN cache.

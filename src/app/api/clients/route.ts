@@ -1,13 +1,14 @@
 ﻿import { NextResponse } from 'next/server'
 import pool from '@/lib/db'
+import { publicContentResponse } from '@/lib/public-content-response'
 import { requireAdmin } from '@/lib/admin-auth'
 import { oneOf, optionalHttpsUrl, optionalString, readJsonObject, requiredString, validationResponse } from '@/lib/validation'
 
 // GET – automatically returns entity_type because of SELECT *
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const result = await pool.query('SELECT * FROM clients ORDER BY created_at DESC')
-    return NextResponse.json(result.rows)
+    return publicContentResponse(request, result.rows)
   } catch {
     return NextResponse.json({ error: 'Failed to fetch' }, { status: 500 })
   }

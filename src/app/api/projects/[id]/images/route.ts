@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import pool from '@/lib/db'
+import { publicContentResponse } from '@/lib/public-content-response'
 import { requireAdmin } from '@/lib/admin-auth'
 import { optionalString, optionalHttpsUrl, positiveInteger, readJsonObject, validationResponse } from '@/lib/validation'
 
@@ -17,7 +18,7 @@ export async function GET(
        ORDER BY display_order ASC`,
       [id]
     )
-    return NextResponse.json(result.rows)
+    return publicContentResponse(request, result.rows)
   } catch (error) {
     const invalid = validationResponse(error)
     if (invalid) return invalid

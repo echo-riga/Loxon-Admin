@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test:cache": "node --test tests/public-content-cache.test.cjs",
+    "test:date": "node --test tests/project-edit-date.test.cjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
