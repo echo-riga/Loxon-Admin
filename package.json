@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "test:cache": "node --test tests/public-content-cache.test.cjs",
-    "test:date": "node --test tests/project-edit-date.test.cjs"
+    "test:date": "node --test tests/project-edit-date.test.cjs",
+    "test:uploads": "node --test tests/direct-image-upload.test.cjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

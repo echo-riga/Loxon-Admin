@@ -1,64 +1,47 @@
-import { createHash } from 'node:crypto'
+﻿import { createHash, randomUUID } from 'node:crypto'
 import { NextResponse } from 'next/server'
 import { getAdminFromRequest, requireAdmin } from '@/lib/admin-auth'
 import { applyRateLimit, rateLimitIdentifier, rateLimits } from '@/lib/rate-limit'
+import { imageUploadError } from '@/lib/image-upload-policy'
+import { readJsonObject, validationResponse } from '@/lib/validation'
 
 export const runtime = 'nodejs'
 
-const MAX_IMAGE_BYTES = 8 * 1024 * 1024
-const ALLOWED_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/avif'])
-
+// Only metadata reaches this endpoint. The browser sends file bytes to Cloudinary.
 export async function POST(request: Request) {
   try {
     const denied = await requireAdmin(request)
     if (denied) return denied
-    const declaredLength = Number(request.headers.get('content-length') || 0)
-    if (declaredLength > MAX_IMAGE_BYTES + 1024 * 1024) {
-      return NextResponse.json({ error: 'Image upload payload must not exceed 9 MB.' }, { status: 413 })
-    }
     const session = await getAdminFromRequest(request)
     const limited = await applyRateLimit(rateLimits.upload, rateLimitIdentifier(request, 'upload', session?.email || ''), true)
     if (limited) return limited
+    const body = await readJsonObject(request, 2048)
+    const invalid = imageUploadError(body.type, body.size)
+    if (invalid) return NextResponse.json({ error: invalid.message }, { status: invalid.status })
+
     const cloudName = process.env.CLOUDINARY_CLOUD_NAME
     const apiKey = process.env.CLOUDINARY_API_KEY
     const apiSecret = process.env.CLOUDINARY_API_SECRET
     if (!cloudName || !apiKey || !apiSecret) {
       return NextResponse.json({ error: 'Image uploads are not configured. Ask an administrator to add the Cloudinary environment variables.' }, { status: 503 })
     }
-    const form = await request.formData()
-    const file = form.get('file')
-    if (!(file instanceof File)) return NextResponse.json({ error: 'No image file was provided.' }, { status: 400 })
-    if (!ALLOWED_TYPES.has(file.type)) return NextResponse.json({ error: 'Unsupported image type. Use JPG, PNG, WebP, GIF, or AVIF.' }, { status: 415 })
-    if (file.size === 0 || file.size > MAX_IMAGE_BYTES) return NextResponse.json({ error: 'Image must be between 1 byte and 8 MB.' }, { status: 413 })
-
-    const bytes = new Uint8Array(await file.arrayBuffer())
-    const signatures: Record<string, number[]> = {
-      'image/jpeg': [0xff, 0xd8, 0xff], 'image/png': [0x89, 0x50, 0x4e, 0x47],
-      'image/gif': [0x47, 0x49, 0x46, 0x38], 'image/webp': [0x52, 0x49, 0x46, 0x46],
-      'image/avif': [0x00, 0x00, 0x00],
+    const params = {
+      allowed_formats: 'jpg,png,webp,gif,avif',
+      folder: 'loxon-admin',
+      overwrite: 'false',
+      public_id: randomUUID(),
+      timestamp: String(Math.floor(Date.now() / 1000)),
     }
-    if (!signatures[file.type].every((byte, index) => bytes[index] === byte)) {
-      return NextResponse.json({ error: 'The selected file does not appear to be a valid image.' }, { status: 400 })
-    }
-
-    const timestamp = Math.floor(Date.now() / 1000)
-    const folder = 'loxon-admin'
-    const signature = createHash('sha1').update(`folder=${folder}&timestamp=${timestamp}${apiSecret}`).digest('hex')
-    const cloudinaryForm = new FormData()
-    cloudinaryForm.append('file', new Blob([bytes], { type: file.type }), file.name)
-    cloudinaryForm.append('api_key', apiKey)
-    cloudinaryForm.append('timestamp', String(timestamp))
-    cloudinaryForm.append('folder', folder)
-    cloudinaryForm.append('signature', signature)
-    const response = await fetch(`https://api.cloudinary.com/v1_1/${encodeURIComponent(cloudName)}/image/upload`, { method: 'POST', body: cloudinaryForm, cache: 'no-store' })
-    const result = await response.json() as { secure_url?: string; public_id?: string; width?: number; height?: number; format?: string }
-    if (!response.ok || !result.secure_url) {
-      console.error('Cloudinary upload failed with status', response.status)
-      return NextResponse.json({ error: 'The image host rejected the upload. Check the server configuration and try again.' }, { status: 502 })
-    }
-    return NextResponse.json({ secureUrl: result.secure_url, publicId: result.public_id, width: result.width, height: result.height, format: result.format })
+    const toSign = Object.entries(params).sort(([a], [b]) => a.localeCompare(b)).map(([key, value]) => `${key}=${value}`).join('&')
+    const signature = createHash('sha1').update(`${toSign}${apiSecret}`).digest('hex')
+    return NextResponse.json({
+      uploadUrl: `https://api.cloudinary.com/v1_1/${encodeURIComponent(cloudName)}/image/upload`,
+      params: { ...params, api_key: apiKey, signature },
+    }, { headers: { 'Cache-Control': 'private, no-store' } })
   } catch (error) {
-    console.error('Image upload failed:', error instanceof Error ? error.message : 'Unknown error')
-    return NextResponse.json({ error: 'Unable to upload the image right now.' }, { status: 500 })
+    const invalid = validationResponse(error)
+    if (invalid) return invalid
+    console.error('Image upload signing failed:', error instanceof Error ? error.message : 'Unknown error')
+    return NextResponse.json({ error: 'Unable to prepare the image upload right now.' }, { status: 500 })
   }
 }

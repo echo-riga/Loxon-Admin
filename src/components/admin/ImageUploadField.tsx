@@ -4,9 +4,8 @@ import { useRef, useState } from 'react'
 import { Alert, Box, Button, CircularProgress, FormHelperText, Typography } from '@mui/material'
 import { CloudUpload, Delete, ImageOutlined } from '@mui/icons-material'
 
-const MAX_IMAGE_BYTES = 8 * 1024 * 1024
-const ALLOWED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/avif'])
-const IMAGE_ACCEPT = 'image/jpeg,image/png,image/webp,image/gif,image/avif'
+import { IMAGE_ACCEPT } from '@/lib/image-upload-policy'
+import { uploadImage } from '@/lib/upload-image'
 
 type Props = {
   label: string
@@ -16,39 +15,24 @@ type Props = {
   required?: boolean
 }
 
-async function errorMessage(response: Response) {
-  try {
-    const data = await response.json() as { error?: string }
-    return data.error || 'Image upload failed.'
-  } catch {
-    return 'Image upload failed.'
-  }
-}
-
 export default function ImageUploadField({ label, value, onChange, helperText, required }: Props) {
   const inputRef = useRef<HTMLInputElement>(null)
+  const uploadPending = useRef(false)
   const [dragging, setDragging] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState('')
 
   const upload = async (file?: File) => {
-    if (!file) return
+    if (!file || uploadPending.current) return
     setError('')
-    if (!ALLOWED_IMAGE_TYPES.has(file.type)) return setError('Choose a JPG, PNG, WebP, GIF, or AVIF image.')
-    if (file.size > MAX_IMAGE_BYTES) return setError('Image must be 8 MB or smaller.')
-
+    uploadPending.current = true
     setUploading(true)
     try {
-      const body = new FormData()
-      body.append('file', file)
-      const response = await fetch('/api/uploads/images', { method: 'POST', body })
-      if (!response.ok) throw new Error(await errorMessage(response))
-      const data = await response.json() as { secureUrl?: string }
-      if (!data.secureUrl) throw new Error('Upload completed without an image URL.')
-      onChange(data.secureUrl)
+      onChange(await uploadImage(file))
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Image upload failed.')
     } finally {
+      uploadPending.current = false
       setUploading(false)
       if (inputRef.current) inputRef.current.value = ''
     }

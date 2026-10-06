@@ -37,7 +37,7 @@ Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/bui
 
 ## Image uploads
 
-Admin image fields upload to Cloudinary through the server route at `/api/uploads/images`. Add these server-only values to `.env.local` or your deployment environment:
+Admin image fields upload directly from the browser to Cloudinary. The authenticated, rate-limited `/api/uploads/images` route receives only small JSON file metadata and returns signed upload parameters; the file never passes through Vercel. Project covers, project galleries, clients, and product/service images all use this flow. Add these server-only values to `.env.local` or your deployment environment:
 
 ```env
 CLOUDINARY_CLOUD_NAME=your-cloud-name
@@ -46,6 +46,8 @@ CLOUDINARY_API_SECRET=your-api-secret
 ```
 
 Restart the development server after changing environment variables. The app builds without these values; upload attempts return a clear configuration message until all three are present. Never expose `CLOUDINARY_API_SECRET` through a `NEXT_PUBLIC_` variable.
+
+The browser and signing route validate the existing 8 MB limit and accepted MIME types. Cloudinary validates the actual image format using signed `allowed_formats` parameters, and its account limits still apply. Metadata size is not verification of uploaded bytes; configure Cloudinary upload restrictions if a hard storage-side size limit is required. Each signature uses a unique public ID with overwriting disabled. After uploading, save the form (or add the gallery image) to store its HTTPS URL. The public website continues displaying those URLs without an export rebuild.
 
 ## Admin security
 
