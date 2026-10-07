@@ -1,29 +1,8 @@
 import { NextResponse } from 'next/server'
 import { applyRateLimit, rateLimitIdentifier, rateLimits } from '@/lib/rate-limit'
 import { chatMessages, readJsonObject, validationResponse } from '@/lib/validation'
-import type { ChatMessage } from '@/lib/validation'
 
 const OFF_TOPIC_REPLY = `I'm here to assist with questions about Loxon Philippines—our services, projects, careers, contact information, and related topics. If you have any Loxon-related inquiry, feel free to let me know!`
-
-function isClearlyOffTopic(messages: ChatMessage[]) {
-  const latest = [...messages].reverse().find(message => message.role === 'user')?.content.trim() || ''
-  const normalized = latest.toLowerCase().replace(/\s+/g, ' ').trim()
-
-  const greetingOrConversation = /^(?:hi|hello|hey|good (?:morning|afternoon|evening)|thanks?|thank you|okay|ok|yes|no|bye|goodbye|help|can you help me|what can you do)[!.?]*$/i
-  const loxonTopic = /\b(?:loxon|lpi|company|services?|offerings?|capabilit(?:y|ies)|products?|projects?|portfolio|clients?|customers?|partners?|memberships?|associations?|careers?|jobs?|positions?|vacanc(?:y|ies)|hiring|apply|application|resume|cv|contact|email|phone|telephone|address|offices?|warehouse|locations?|business hours|quotes?|quotations?|estimates?|inquir(?:y|ies)|engineer(?:ing|s)?|construction|contractors?|buildings?|infrastructure|industrial|commercial|residential|hospitality|fire|alarms?|smoke|detectors?|sprinklers?|suppression|safety|security|cctv|automation|building management|electrical|mechanical|installation|maintenance)\b/i
-  const naturalIdentityQuestion = /^(?:who are you|what are you|what is this chat(?:bot)?|how can you help)[!.?]*$/i
-  const contextualFollowUp = /^(?:tell me more|more details|what about (?:that|it|those|them)|how much|where is (?:it|that)|how does (?:it|that) work|can you explain|which ones?|show me more)[!.?]*$/i
-  const earlierLoxonQuestion = messages
-    .slice(0, -1)
-    .some(message => message.role === 'user' && loxonTopic.test(message.content))
-
-  return !(
-    greetingOrConversation.test(normalized)
-    || naturalIdentityQuestion.test(normalized)
-    || loxonTopic.test(normalized)
-    || (earlierLoxonQuestion && contextualFollowUp.test(normalized))
-  )
-}
 
 async function buildSystemPrompt(request: Request) {
   const apiBase = new URL(request.url).origin
@@ -73,7 +52,11 @@ Verified company information:
 
 Behavior rules:
 - Answer questions related to Loxon, its projects, services, products, partners, memberships, careers, contact details, and the engineering or fire-safety topics those offerings cover.
-- Understand natural synonyms and implied context. Users do not need to mention Loxon explicitly.
+- Determine relevance from the meaning of the entire conversation, not keyword matches in the latest message.
+- Understand natural synonyms, misspellings, informal wording, and implied context. Users do not need to mention Loxon explicitly.
+- Resolve short follow-ups such as "how much?", "can you fix it?", or "what do I need?" using earlier messages.
+- If a request could reasonably concern Loxon but its meaning is unclear, ask one brief clarifying question instead of rejecting it.
+- Support customer-service inquiries about faults, repairs, complaints, quotations, and existing installations. Ask for relevant details and guide visitors to /contact when staff assistance is needed. Do not claim to have submitted a request, booked a visit, or accessed customer records.
 - Interpret phrases such as your projects, fire alarms, building systems, open positions, and how do I reach you in the Loxon context.
 - For broad industry questions, briefly explain how the topic relates to Loxon's listed capabilities. Redirect only when the request is clearly unrelated.
 - Write for ordinary customers first, while still being useful to contractors and engineers.
@@ -110,7 +93,6 @@ export async function POST(request: Request) {
     if (burstLimited) return burstLimited
     const hourlyLimited = await applyRateLimit(rateLimits.chatHourly, identifier, true)
     if (hourlyLimited) return hourlyLimited
-    if (isClearlyOffTopic(messages)) return NextResponse.json({ reply: OFF_TOPIC_REPLY })
     const apiKey = process.env.GROQ_API_KEY
     if (!apiKey) return NextResponse.json({ error: 'Chat service is not configured' }, { status: 500 })
 

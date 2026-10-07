@@ -28,7 +28,7 @@ type Section = { id: string; label: string; singular: string; endpoint: string; 
 type Notice = { open: boolean; message: string; severity: 'success' | 'error' }
 
 const SECTIONS: Section[] = [
-  { id: 'projects', label: 'Projects', singular: 'project', endpoint: '/api/projects', search: ['title', 'description', 'location', 'client_name', 'project_type'], columns: ['image_url', 'title', 'description', 'project_type', 'constructed_date', 'location', 'client_name'], fields: [
+  { id: 'projects', label: 'Projects', singular: 'project', endpoint: '/api/projects', search: ['title', 'description', 'location', 'client_name', 'project_type'], columns: ['image_url', 'title', 'description', 'constructed_date', 'location', 'client_name'], fields: [
     { key: 'title', label: 'Title', required: true }, { key: 'image_url', label: 'Main image', type: 'image' },
     { key: 'description', label: 'Description', type: 'multiline' }, { key: 'video_url', label: 'Video URL' },
     { key: 'project_type', label: 'Project type' }, { key: 'constructed_date', label: 'Constructed date', type: 'date' },
@@ -206,7 +206,7 @@ function CrudSection({ section, project = false }: { section: Section; project?:
           <SortableContext items={rows.map(row => Number(row.id))} strategy={verticalListSortingStrategy}>
             <TableContainer component={Paper} variant="outlined" sx={{ maxWidth: '100%', overflowX: 'auto', borderRadius: 2.5 }}>
               <Table stickyHeader size="small" sx={{ minWidth: 1180 }}>
-                <TableHead><TableRow><HeaderCell />{section.columns.map(column => <HeaderCell key={column}>{labelFor(column === 'image_url' ? 'image' : column)}</HeaderCell>)}<HeaderCell sticky>Actions</HeaderCell></TableRow></TableHead>
+                <TableHead><TableRow><HeaderCell />{section.columns.map(column => <HeaderCell key={column}>{labelFor(column === 'image_url' ? 'image' : column === 'client_name' ? 'status' : column)}</HeaderCell>)}<HeaderCell sticky>Actions</HeaderCell></TableRow></TableHead>
                 <TableBody>{!paged.length ? <EmptyRow columns={section.columns.length + 2} filtered={active} /> : paged.map(row => <SortableProjectRow key={String(row.id)} row={row} columns={section.columns} fields={section.fields} disabled={!canReorder} expanded={expanded === Number(row.id)} onExpand={() => setExpanded(value => value === Number(row.id) ? null : Number(row.id))} onEdit={() => openForm(row)} onDelete={() => void remove(row)} />)}</TableBody>
               </Table>
             </TableContainer>
