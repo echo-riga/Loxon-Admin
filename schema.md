@@ -61,3 +61,10 @@ table_name	column_name	data_type	is_nullable	column_default
 60	projects	constructed_date	date	YES
 61	projects	location	character varying	YES
 62	projects	client_name	character varying	YES
+
+## Content ordering migration (2026-10-10)
+
+`migrations/20261010_content_order.sql` adds a nullable integer `sort_order`
+column to `products_services`, `clients`, and `jobs`, and initializes existing
+rows in their previous newest-first order. Apply this migration before using
+the updated content routes. The projects schema remains unchanged.

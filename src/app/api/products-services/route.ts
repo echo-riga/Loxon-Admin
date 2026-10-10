@@ -6,7 +6,7 @@ import { optionalHttpsUrl, optionalString, readJsonObject, requiredString, valid
  
 export async function GET(request: Request) {
   try {
-    const result = await pool.query('SELECT * FROM products_services ORDER BY created_at DESC')
+    const result = await pool.query('SELECT * FROM products_services ORDER BY sort_order ASC NULLS LAST, created_at DESC, id DESC')
     return publicContentResponse(request, result.rows)
   } catch {
     return NextResponse.json({ error: 'Failed to fetch' }, { status: 500 })
@@ -23,7 +23,7 @@ export async function POST(request: Request) {
     const description = optionalString(body, 'description', 'Description', 10_000)
     const video_url = optionalHttpsUrl(body, 'video_url', 'Video URL')
     const result = await pool.query(
-      'INSERT INTO products_services (image_url, title, description, video_url) VALUES ($1, $2, $3, $4) RETURNING *',
+      'INSERT INTO products_services (image_url, title, description, video_url, sort_order) VALUES ($1, $2, $3, $4, (SELECT COALESCE(MAX(sort_order), -1) + 1 FROM products_services)) RETURNING *',
       [image_url, title, description, video_url]
     )
     return NextResponse.json(result.rows[0])

@@ -62,3 +62,27 @@ Successful GET responses for projects, project images, products/services, client
 Dashboard collection requests use `?fresh=1`, which returns `no-store` responses and bypasses the public CDN cache so edits are visible immediately in Admin. Public content may reflect edits after its existing CDN entry expires. Error responses, private submission lists, authentication, uploads, and POST/PUT/DELETE operations do not receive the public cache policy.
 
 Redeploy Admin on Vercel to activate these headers. After deployment, repeat a public GET with the same Origin and inspect `x-vercel-cache` for `HIT` and `age` for its cache age. Local development verifies the headers but does not provide a Vercel CDN cache.
+
+## Content ordering
+
+Projects, Products & Services, Clients, and Jobs have an Order drag handle. Clear
+filters and show every row on the first page before reordering. For more than
+100 records select All (up to 1,000). Drag a handle, or focus it and press Space,
+use arrow keys, and press Space again. Saves are automatic; failures show an
+error and reload the server order. Project gallery management is unchanged.
+
+Before deploying the new routes, configure DATABASE_URL in .env.local (or your
+terminal environment) and apply the additive migration:
+
+```bash
+node scripts/migrate-content-order.cjs
+```
+
+The migration preserves existing newest-first order for products/services,
+clients, and jobs and adds only position values and indexes. It is safe to rerun
+without resetting saved positions. The runner verifies record counts and every
+existing field (excluding sort_order) before committing. New records append to
+the list; edits preserve positions. Reordering requires an admin session and a
+complete current list of IDs. Concurrent additions/deletions cause a refresh
+error instead of a partial reorder. Public Website uses the API order; its
+existing CDN cache can delay display updates by up to 60 seconds.

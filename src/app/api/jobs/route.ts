@@ -6,7 +6,7 @@ import { optionalString, readJsonObject, requiredString, validationResponse } fr
  
 export async function GET(request: Request) {
   try {
-    const result = await pool.query('SELECT * FROM jobs ORDER BY created_at DESC')
+    const result = await pool.query('SELECT * FROM jobs ORDER BY sort_order ASC NULLS LAST, created_at DESC, id DESC')
     return publicContentResponse(request, result.rows)
   } catch {
     return NextResponse.json({ error: 'Failed to fetch' }, { status: 500 })
@@ -21,7 +21,7 @@ export async function POST(request: Request) {
     const title = requiredString(body, 'title', 'Job title', 160)
     const description = optionalString(body, 'description', 'Description', 10_000)
     const result = await pool.query(
-      'INSERT INTO jobs (title, description) VALUES ($1, $2) RETURNING *',
+      'INSERT INTO jobs (title, description, sort_order) VALUES ($1, $2, (SELECT COALESCE(MAX(sort_order), -1) + 1 FROM jobs)) RETURNING *',
       [title, description]
     )
     return NextResponse.json(result.rows[0])

@@ -7,7 +7,7 @@ import { oneOf, optionalHttpsUrl, optionalString, readJsonObject, requiredString
 // GET – automatically returns entity_type because of SELECT *
 export async function GET(request: Request) {
   try {
-    const result = await pool.query('SELECT * FROM clients ORDER BY created_at DESC')
+    const result = await pool.query('SELECT * FROM clients ORDER BY sort_order ASC NULLS LAST, created_at DESC, id DESC')
     return publicContentResponse(request, result.rows)
   } catch {
     return NextResponse.json({ error: 'Failed to fetch' }, { status: 500 })
@@ -26,8 +26,8 @@ export async function POST(request: Request) {
     const link = optionalHttpsUrl(body, 'link', 'Website link')
     const entity_type = oneOf(body, 'entity_type', 'Entity type', ['partner', 'membership'] as const, 'partner')
     const result = await pool.query(
-      `INSERT INTO clients (image_url, title, description, link, entity_type)
-       VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+      `INSERT INTO clients (image_url, title, description, link, entity_type, sort_order)
+       VALUES ($1, $2, $3, $4, $5, (SELECT COALESCE(MAX(sort_order), -1) + 1 FROM clients)) RETURNING *`,
       [image_url, title, description, link, entity_type || 'partner']
     )
     return NextResponse.json(result.rows[0])

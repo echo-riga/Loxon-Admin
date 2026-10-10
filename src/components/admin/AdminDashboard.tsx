@@ -16,8 +16,8 @@ import { DatePicker } from '@mui/x-date-pickers/DatePicker'
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider'
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs'
 import dayjs, { Dayjs } from 'dayjs'
-import { DndContext, DragEndEvent, PointerSensor, closestCenter, useSensor, useSensors } from '@dnd-kit/core'
-import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
+import { DndContext, DragEndEvent, PointerSensor, KeyboardSensor, closestCenter, useSensor, useSensors } from '@dnd-kit/core'
+import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy, sortableKeyboardCoordinates } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import ImageUploadField from './ImageUploadField'
 import { editFormValues } from '@/lib/edit-form'
@@ -94,7 +94,7 @@ function FilterToolbar({ search, onSearch, active, onClear, count, total, childr
 }
 
 function ResponsivePagination({ count, page, perPage, setPage, setPerPage }: { count: number; page: number; perPage: number; setPage: (value: number) => void; setPerPage: (value: number) => void }) {
-  return <Box sx={{ overflowX: 'auto' }}><TablePagination component="div" count={count} page={Math.min(page, Math.max(0, Math.ceil(count / perPage) - 1))} rowsPerPage={perPage} rowsPerPageOptions={ROWS_PER_PAGE} onPageChange={(_, value) => setPage(value)} onRowsPerPageChange={event => { setPerPage(Number(event.target.value)); setPage(0) }} sx={{ minWidth: 360, '.MuiTablePagination-toolbar': { px: { xs: 0.5, sm: 2 } } }} /></Box>
+  return <Box sx={{ overflowX: 'auto' }}><TablePagination component="div" count={count} page={Math.min(page, Math.max(0, Math.ceil(count / perPage) - 1))} rowsPerPage={perPage} rowsPerPageOptions={[...ROWS_PER_PAGE, ...(count > 100 && count <= 1000 ? [{ label: 'All', value: count }] : [])]} onPageChange={(_, value) => setPage(value)} onRowsPerPageChange={event => { setPerPage(Number(event.target.value)); setPage(0) }} sx={{ minWidth: 360, '.MuiTablePagination-toolbar': { px: { xs: 0.5, sm: 2 } } }} /></Box>
 }
 
 function ProjectImages({ projectId }: { projectId: number }) {
@@ -111,13 +111,13 @@ function ProjectImages({ projectId }: { projectId: number }) {
   </Box>
 }
 
-function SortableProjectRow({ row, columns, fields, disabled, expanded, onExpand, onEdit, onDelete }: { row: Row; columns: string[]; fields: Field[]; disabled: boolean; expanded: boolean; onExpand: () => void; onEdit: () => void; onDelete: () => void }) {
+function SortableContentRow({ project, row, columns, fields, disabled, expanded, onExpand, onEdit, onDelete }: { project: boolean; row: Row; columns: string[]; fields: Field[]; disabled: boolean; expanded: boolean; onExpand: () => void; onEdit: () => void; onDelete: () => void }) {
   const sortable = useSortable({ id: Number(row.id), disabled })
   return <><TableRow ref={sortable.setNodeRef} style={{ transform: CSS.Transform.toString(sortable.transform), transition: sortable.transition, opacity: sortable.isDragging ? 0.5 : 1 }} hover>
     <TableCell sx={{ width: 38 }}><Tooltip title={disabled ? 'Reorder is available when filters are clear and all rows are shown.' : 'Drag to reorder'}><Box component="span" {...sortable.attributes} {...sortable.listeners} sx={{ cursor: disabled ? 'not-allowed' : 'grab', color: disabled ? 'text.disabled' : 'text.secondary', fontSize: 20 }}>⋮⋮</Box></Tooltip></TableCell>
     {columns.map(column => <DataCell key={column} column={column} value={row[column]} row={row} field={fields.find(field => field.key === column)} />)}
-    <ActionCell><Tooltip title="Edit"><IconButton aria-label="Edit" size="small" color="primary" onClick={onEdit}><Edit fontSize="small" /></IconButton></Tooltip><Tooltip title="Delete"><IconButton aria-label="Delete" size="small" color="error" onClick={onDelete}><Delete fontSize="small" /></IconButton></Tooltip><Tooltip title={expanded ? 'Hide gallery' : 'Manage gallery'}><IconButton aria-label="Manage project gallery" size="small" onClick={onExpand}>{expanded ? <KeyboardArrowUp /> : <KeyboardArrowDown />}</IconButton></Tooltip></ActionCell>
-  </TableRow><TableRow><TableCell colSpan={columns.length + 2} sx={{ p: 0, border: expanded ? undefined : 0 }}><Collapse in={expanded} unmountOnExit><ProjectImages projectId={Number(row.id)} /></Collapse></TableCell></TableRow></>
+    <ActionCell><Tooltip title="Edit"><IconButton aria-label="Edit" size="small" color="primary" onClick={onEdit}><Edit fontSize="small" /></IconButton></Tooltip><Tooltip title="Delete"><IconButton aria-label="Delete" size="small" color="error" onClick={onDelete}><Delete fontSize="small" /></IconButton></Tooltip>{project && <Tooltip title={expanded ? 'Hide gallery' : 'Manage gallery'}><IconButton aria-label="Manage project gallery" size="small" onClick={onExpand}>{expanded ? <KeyboardArrowUp /> : <KeyboardArrowDown />}</IconButton></Tooltip>}</ActionCell>
+  </TableRow>{project && <TableRow><TableCell colSpan={columns.length + 2} sx={{ p: 0, border: expanded ? undefined : 0 }}><Collapse in={expanded} unmountOnExit><ProjectImages projectId={Number(row.id)} /></Collapse></TableCell></TableRow>}</>
 }
 
 function DataCell({ column, value, row, field }: { column: string; value: unknown; row: Row; field?: Field }) {
@@ -151,7 +151,7 @@ function CrudSection({ section, project = false }: { section: Section; project?:
   const [rows, setRows] = useState<Row[]>([]); const [loading, setLoading] = useState(true); const [error, setError] = useState('')
   const [search, setSearch] = useState(''); const [filters, setFilters] = useState<Record<string, string>>({}); const [page, setPage] = useState(0); const [perPage, setPerPage] = useState(10)
   const [open, setOpen] = useState(false); const [editing, setEditing] = useState<Row | null>(null); const [form, setForm] = useState<Row>({}); const [expanded, setExpanded] = useState<number | null>(null)
-  const [notice, setNotice] = useState<Notice>({ open: false, message: '', severity: 'success' }); const sensors = useSensors(useSensor(PointerSensor))
+  const [notice, setNotice] = useState<Notice>({ open: false, message: '', severity: 'success' }); const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }), useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }))
   const load = useCallback(async () => { setLoading(true); setError(''); try { const response = await fetch(`${section.endpoint}?fresh=1`); if (!response.ok) throw new Error(await apiError(response)); const body = await response.json(); setRows(Array.isArray(body) ? body : []) } catch (cause) { setRows([]); setError(cause instanceof Error ? cause.message : 'Unable to load records.') } finally { setLoading(false) } }, [section.endpoint])
   useEffect(() => { void load() }, [load])
   useEffect(() => { setPage(0) }, [search, filters])
@@ -165,10 +165,10 @@ function CrudSection({ section, project = false }: { section: Section; project?:
     return true
   }), [rows, search, filters, section])
   const active = Boolean(search.trim() || Object.values(filters).some(Boolean)); const paged = filtered.slice(page * perPage, page * perPage + perPage)
-  const canReorder = project && !reordering && !active && page === 0 && perPage >= rows.length
+  const canReorder = !loading && !error && rows.length > 1 && rows.length <= 1000 && !reordering && !active && page === 0 && perPage >= rows.length
   const openForm = (row?: Row) => { setEditing(row || null); setForm(row ? editFormValues(row, section.fields.filter(field => field.type === 'date').map(field => field.key)) : {}); setOpen(true) }
-  const save = async () => { try { const response = await fetch(editing ? `${section.endpoint}/${editing.id}` : section.endpoint, { method: editing ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) }); if (!response.ok) throw new Error(await apiError(response)); setOpen(false); setNotice({ open: true, message: `${section.singular[0].toUpperCase()}${section.singular.slice(1)} ${editing ? 'updated' : 'added'}.`, severity: 'success' }); await load() } catch (cause) { setNotice({ open: true, message: cause instanceof Error ? cause.message : 'Unable to save.', severity: 'error' }) } }
-  const remove = async (row: Row) => { if (!confirm(`Delete “${String(row.title || 'this record')}”?`)) return; const response = await fetch(`${section.endpoint}/${row.id}`, { method: 'DELETE' }); if (!response.ok) return setNotice({ open: true, message: await apiError(response), severity: 'error' }); setNotice({ open: true, message: 'Record deleted.', severity: 'success' }); await load() }
+  const save = async () => { if (reorderPending.current) return; try { const response = await fetch(editing ? `${section.endpoint}/${editing.id}` : section.endpoint, { method: editing ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) }); if (!response.ok) throw new Error(await apiError(response)); setOpen(false); setNotice({ open: true, message: `${section.singular[0].toUpperCase()}${section.singular.slice(1)} ${editing ? 'updated' : 'added'}.`, severity: 'success' }); await load() } catch (cause) { setNotice({ open: true, message: cause instanceof Error ? cause.message : 'Unable to save.', severity: 'error' }) } }
+  const remove = async (row: Row) => { if (reorderPending.current) return; if (!confirm(`Delete “${String(row.title || 'this record')}”?`)) return; const response = await fetch(`${section.endpoint}/${row.id}`, { method: 'DELETE' }); if (!response.ok) return setNotice({ open: true, message: await apiError(response), severity: 'error' }); setNotice({ open: true, message: 'Record deleted.', severity: 'success' }); await load() }
   const onDragEnd = async ({ active: source, over }: DragEndEvent) => {
     if (!canReorder || reorderPending.current || !over || source.id === over.id) return
     const oldIndex = rows.findIndex(row => Number(row.id) === source.id)
@@ -180,12 +180,12 @@ function CrudSection({ section, project = false }: { section: Section; project?:
     setReordering(true)
     setRows(reordered)
     try {
-      const response = await fetch('/api/projects/reorder', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ orderedIds: reordered.map(row => row.id) }) })
+      const response = await fetch(`${section.endpoint}/reorder`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ orderedIds: reordered.map(row => row.id) }) })
       if (!response.ok) throw new Error(await apiError(response))
-      setNotice({ open: true, message: 'Project order saved.', severity: 'success' })
+      setNotice({ open: true, message: `${section.label} order saved.`, severity: 'success' })
     } catch (cause) {
       setRows(previousRows)
-      setNotice({ open: true, message: cause instanceof Error ? cause.message : 'Unable to save project order.', severity: 'error' })
+      setNotice({ open: true, message: cause instanceof Error ? cause.message : 'Unable to save order.', severity: 'error' })
       // A connection can fail after the server saved; read its actual order when possible.
       await load()
     } finally {
@@ -196,30 +196,21 @@ function CrudSection({ section, project = false }: { section: Section; project?:
   const renderField = (field: Field) => field.type === 'image' ? <ImageUploadField key={field.key} label={field.label} value={String(form[field.key] || '')} onChange={value => setForm(previous => ({ ...previous, [field.key]: value }))} /> : field.type === 'select' ? <TextField key={field.key} select label={field.label} value={String(form[field.key] || '')} onChange={event => setForm(previous => ({ ...previous, [field.key]: event.target.value }))}>{field.options?.map(option => <MenuItem key={option} value={option}>{labelFor(option)}</MenuItem>)}</TextField> : field.type === 'date' ? <FormDateField key={field.key} field={field} value={form[field.key]} onChange={value => setForm(previous => ({ ...previous, [field.key]: value }))} /> : <TextField key={field.key} required={field.required} type={'text'} label={field.label} multiline={field.type === 'multiline'} minRows={field.type === 'multiline' ? 3 : undefined} value={String(form[field.key] || '')} onChange={event => setForm(previous => ({ ...previous, [field.key]: event.target.value }))} />
   return <SectionShell title={section.label} count={rows.length} action={<Button variant="contained" startIcon={<Add />} onClick={() => openForm()}>Add {section.singular}</Button>}>
     <FilterToolbar search={search} onSearch={setSearch} active={active} onClear={() => { setSearch(''); setFilters({}) }} count={filtered.length} total={rows.length} onExport={() => exportCsv(filtered, section.id)}>{section.id === 'projects' && <><FilterSelect label="Project type" value={filters.type} options={values('project_type')} onChange={value => setFilters(current => ({ ...current, type: value }))} /><FilterSelect label="Location" value={filters.location} options={values('location')} onChange={value => setFilters(current => ({ ...current, location: value }))} /><FilterSelect label="Year" value={filters.year} options={[...new Set(rows.map(row => dayjs(String(row.constructed_date)).isValid() ? dayjs(String(row.constructed_date)).format('YYYY') : '').filter(Boolean))].sort().reverse()} onChange={value => setFilters(current => ({ ...current, year: value }))} /></>}{section.id === 'products-services' && <FilterSelect label="Media" value={filters.media} options={['image', 'video', 'both', 'none']} onChange={value => setFilters(current => ({ ...current, media: value }))} />}{section.id === 'clients' && <><FilterSelect label="Entity type" value={filters.entity} options={values('entity_type')} onChange={value => setFilters(current => ({ ...current, entity: value }))} /><FilterSelect label="Image" value={filters.image} options={['yes', 'no']} onChange={value => setFilters(current => ({ ...current, image: value }))} /><FilterSelect label="Link" value={filters.link} options={['yes', 'no']} onChange={value => setFilters(current => ({ ...current, link: value }))} /></>}</FilterToolbar>
-    {project && !canReorder && <Alert severity="info" sx={{ mb: 2 }}>{reordering ? 'Saving project order…' : `To reorder projects, clear filters, go to the first page, and show all ${rows.length} records.`}</Alert>}
+    {rows.length > 1 && !canReorder && <Alert severity="info" sx={{ mb: 2 }}>{rows.length > 1000 ? 'Reordering supports up to 1,000 records.' : reordering ? 'Saving order…' : `To reorder ${section.label.toLowerCase()}, clear filters, go to the first page, and show all ${rows.length} records.`}</Alert>}
     {error ? <Alert severity="error" action={<Button onClick={() => void load()}>Retry</Button>}>{error}</Alert> : loading ? <LoadingState /> : <>
       <Typography variant="caption" color="text.secondary" sx={{ display: { xs: 'block', sm: 'none' }, mb: 0.75 }}>
         Swipe horizontally to view every column and row action.
       </Typography>
-      {project ? (
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
           <SortableContext items={rows.map(row => Number(row.id))} strategy={verticalListSortingStrategy}>
             <TableContainer component={Paper} variant="outlined" sx={{ maxWidth: '100%', overflowX: 'auto', borderRadius: 2.5 }}>
-              <Table stickyHeader size="small" sx={{ minWidth: 1180 }}>
-                <TableHead><TableRow><HeaderCell />{section.columns.map(column => <HeaderCell key={column}>{labelFor(column === 'image_url' ? 'image' : column === 'client_name' ? 'status' : column)}</HeaderCell>)}<HeaderCell sticky>Actions</HeaderCell></TableRow></TableHead>
-                <TableBody>{!paged.length ? <EmptyRow columns={section.columns.length + 2} filtered={active} /> : paged.map(row => <SortableProjectRow key={String(row.id)} row={row} columns={section.columns} fields={section.fields} disabled={!canReorder} expanded={expanded === Number(row.id)} onExpand={() => setExpanded(value => value === Number(row.id) ? null : Number(row.id))} onEdit={() => openForm(row)} onDelete={() => void remove(row)} />)}</TableBody>
+              <Table stickyHeader size="small" sx={{ minWidth: project ? 1180 : section.id === 'jobs' ? 700 : 900 }}>
+                <TableHead><TableRow><HeaderCell>Order</HeaderCell>{section.columns.map(column => <HeaderCell key={column}>{labelFor(column === 'image_url' ? 'image' : column === 'client_name' ? 'status' : column)}</HeaderCell>)}<HeaderCell sticky>Actions</HeaderCell></TableRow></TableHead>
+                <TableBody>{!paged.length ? <EmptyRow columns={section.columns.length + 2} filtered={active} /> : paged.map(row => <SortableContentRow project={project} key={String(row.id)} row={row} columns={section.columns} fields={section.fields} disabled={!canReorder} expanded={expanded === Number(row.id)} onExpand={() => setExpanded(value => value === Number(row.id) ? null : Number(row.id))} onEdit={() => openForm(row)} onDelete={() => void remove(row)} />)}</TableBody>
               </Table>
             </TableContainer>
           </SortableContext>
         </DndContext>
-      ) : (
-        <TableContainer component={Paper} variant="outlined" sx={{ maxWidth: '100%', overflowX: 'auto', borderRadius: 2.5 }}>
-          <Table stickyHeader size="small" sx={{ minWidth: section.id === 'jobs' ? 650 : 850 }}>
-            <TableHead><TableRow>{section.columns.map(column => <HeaderCell key={column}>{labelFor(column === 'image_url' ? 'image' : column)}</HeaderCell>)}<HeaderCell sticky>Actions</HeaderCell></TableRow></TableHead>
-            <TableBody>{!paged.length ? <EmptyRow columns={section.columns.length + 1} filtered={active} /> : paged.map(row => <TableRow key={String(row.id)} hover>{section.columns.map(column => <DataCell key={column} column={column} value={row[column]} row={row} field={section.fields.find(field => field.key === column)} />)}<ActionCell><Tooltip title="Edit"><IconButton aria-label="Edit" size="small" color="primary" onClick={() => openForm(row)}><Edit fontSize="small" /></IconButton></Tooltip><Tooltip title="Delete"><IconButton aria-label="Delete" size="small" color="error" onClick={() => void remove(row)}><Delete fontSize="small" /></IconButton></Tooltip></ActionCell></TableRow>)}</TableBody>
-          </Table>
-        </TableContainer>
-      )}
       <ResponsivePagination count={filtered.length} page={page} perPage={perPage} setPage={setPage} setPerPage={setPerPage} />
     </>}
     <Dialog open={open} onClose={() => setOpen(false)} fullWidth maxWidth="sm"><DialogTitle>{editing ? 'Edit' : 'Add'} {section.singular}</DialogTitle><DialogContent sx={{ display: 'grid', gap: 2, pt: '18px !important' }}>{section.fields.map(renderField)}</DialogContent><DialogActions><Button onClick={() => setOpen(false)}>Cancel</Button><Button variant="contained" onClick={() => void save()}>{editing ? 'Save changes' : 'Add record'}</Button></DialogActions></Dialog>
