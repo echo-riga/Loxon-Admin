@@ -1,27 +1,23 @@
 'use client'
 
-import Logout from '@mui/icons-material/Logout'
-import { Box, Button } from '@mui/material'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import AdminDashboard from './AdminDashboard'
 
 export default function AdminShell() {
   const router = useRouter()
+  const [signingOut, setSigningOut] = useState(false)
 
   const logout = async () => {
-    await fetch('/api/auth/logout', { method: 'POST' })
-    router.replace('/login')
-    router.refresh()
+    setSigningOut(true)
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' })
+      router.replace('/login')
+      router.refresh()
+    } finally {
+      setSigningOut(false)
+    }
   }
 
-  return (
-    <Box sx={{ '& .MuiAppBar-root > .MuiToolbar-root': { pr: { xs: '118px', sm: '132px' } } }}>
-      <Box sx={{ position: 'fixed', top: 14, right: 18, zIndex: 1300 }}>
-        <Button variant={'outlined'} color={'inherit'} size={'small'} startIcon={<Logout />} onClick={() => void logout()} sx={{ bgcolor: 'background.paper' }}>
-          Sign out
-        </Button>
-      </Box>
-      <AdminDashboard />
-    </Box>
-  )
+  return <AdminDashboard onSignOut={() => void logout()} signingOut={signingOut} />
 }

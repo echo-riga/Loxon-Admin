@@ -36,10 +36,10 @@ function LoginForm() {
   }
 
   return (
-    <Paper component={'main'} elevation={10} sx={{ width: 'min(430px, calc(100vw - 32px))', p: { xs: 3, sm: 5 }, borderRadius: 3 }}>
+    <Paper component={'main'} variant="outlined" sx={{ width: 'min(430px, calc(100vw - 32px))', p: { xs: 3, sm: 5 }, borderRadius: 2 }}>
       <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', mb: 3 }}>
         <Avatar sx={{ bgcolor: 'primary.main', mb: 1.5 }}><LockOutlined /></Avatar>
-        <Typography component={'h1'} variant={'h4'} sx={{ fontWeight: 800 }}>Loxon Admin</Typography>
+        <Typography component={'h1'} variant={'h4'} sx={{ fontWeight: 600 }}>Loxon Admin</Typography>
         <Typography color={'text.secondary'} sx={{ mt: 0.5 }}>Sign in to manage website content.</Typography>
       </Box>
       <Box component={'form'} onSubmit={submit} sx={{ display: 'grid', gap: 2 }}>
@@ -56,7 +56,7 @@ function LoginForm() {
 
 export default function LoginPage() {
   return (
-    <Box sx={{ minHeight: '100vh', display: 'grid', placeItems: 'center', bgcolor: '#eef3f8', p: 2 }}>
+    <Box sx={{ minHeight: '100vh', display: 'grid', placeItems: 'center', bgcolor: 'background.default', p: 2 }}>
       <Suspense fallback={<CircularProgress />}><LoginForm /></Suspense>
     </Box>
   )

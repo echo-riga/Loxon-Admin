@@ -86,3 +86,7 @@ the list; edits preserve positions. Reordering requires an admin session and a
 complete current list of IDs. Concurrent additions/deletions cause a refresh
 error instead of a partial reorder. Public Website uses the API order; its
 existing CDN cache can delay display updates by up to 60 seconds.
+
+## Admin interface
+
+The admin uses Inter, neutral surfaces, blue primary actions, and readable table rows. Desktop navigation is a sidebar at 1200px and above; smaller screens use scrollable section tabs. Sign out stays in the header. Tables scroll horizontally within their container when needed, with row actions pinned on larger screens. Loading states retain the table layout, and dialogs use the same typography and neutral headings. Reduced-motion preferences are respected.

@@ -6,11 +6,11 @@ import {
   Alert, AppBar, Box, Button, Chip, CircularProgress, Collapse, Container, Dialog, DialogActions,
   DialogContent, DialogTitle, IconButton, InputAdornment, MenuItem, Paper, Snackbar, Tab, Table,
   TableBody, TableCell, TableContainer, TableHead, TablePagination, TableRow, Tabs, TextField,
-  Toolbar, Tooltip, Typography,
+  Toolbar, Tooltip, Typography, Skeleton, useMediaQuery,
 } from '@mui/material'
 import {
   Add, Business, Clear, Delete, Edit, FileDownload, FilterAltOff, ImageOutlined,
-  KeyboardArrowDown, KeyboardArrowUp, Search,
+  KeyboardArrowDown, KeyboardArrowUp, Search, FolderOutlined, CategoryOutlined, GroupsOutlined, WorkOutlined, MailOutlined, AssignmentOutlined, Logout,
 } from '@mui/icons-material'
 import { DatePicker } from '@mui/x-date-pickers/DatePicker'
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider'
@@ -48,7 +48,8 @@ const SECTIONS: Section[] = [
   ]},
 ]
 
-const TAB_LABELS = ['Projects', 'Products & Services', 'Clients', 'Jobs', 'Contact Submissions', 'Job Applications']
+const TAB_LABELS = ['Projects', 'Products & Services', 'Clients', 'Jobs', 'Contact submissions', 'Job applications']
+const TAB_ICONS = [FolderOutlined, CategoryOutlined, GroupsOutlined, WorkOutlined, MailOutlined, AssignmentOutlined]
 const ROWS_PER_PAGE = [10, 25, 50, 100]
 const normalize = (value: unknown) => String(value ?? '').trim().toLocaleLowerCase()
 const hasValue = (value: unknown) => Boolean(String(value ?? '').trim())
@@ -82,7 +83,7 @@ type ToolbarProps = { search: string; onSearch: (value: string) => void; active:
 function FilterToolbar({ search, onSearch, active, onClear, count, total, children, onExport }: ToolbarProps) {
   return <Paper variant="outlined" sx={{ p: { xs: 1.25, md: 1.5 }, mb: 2, borderRadius: 2.5 }}>
     <Box sx={{ display: 'flex', gap: 1.25, alignItems: 'center', flexWrap: 'wrap' }}>
-      <TextField value={search} onChange={event => onSearch(event.target.value)} placeholder="Search this section" aria-label="Search this section" sx={{ minWidth: { xs: '100%', sm: 270 }, flex: { sm: '1 1 270px', md: '0 1 330px' } }} slotProps={{ input: { startAdornment: <InputAdornment position="start"><Search fontSize="small" /></InputAdornment>, endAdornment: search ? <InputAdornment position="end"><IconButton aria-label="Clear search" size="small" onClick={() => onSearch('')}><Clear fontSize="small" /></IconButton></InputAdornment> : undefined } }} />
+      <TextField value={search} onChange={event => onSearch(event.target.value)} placeholder="Search records" aria-label="Search records" sx={{ minWidth: { xs: '100%', sm: 270 }, flex: { sm: '1 1 270px', md: '0 1 330px' } }} slotProps={{ input: { startAdornment: <InputAdornment position="start"><Search fontSize="small" /></InputAdornment>, endAdornment: search ? <InputAdornment position="end"><IconButton aria-label="Clear search" size="small" onClick={() => onSearch('')}><Clear fontSize="small" /></IconButton></InputAdornment> : undefined } }} />
       {children}
       <Box sx={{ flexGrow: 1 }} />
       <Button variant="outlined" size="small" startIcon={<FileDownload />} onClick={onExport} disabled={!count}>Export CSV</Button>
@@ -125,7 +126,7 @@ function DataCell({ column, value, row, field }: { column: string; value: unknow
   if (column === 'notification_status') { const status = String(value || 'unknown'); return <TableCell><Chip size="small" label={labelFor(status)} color={status === 'sent' ? 'success' : status === 'failed' ? 'error' : 'default'} /></TableCell> }
   const text = field?.type === 'date' ? formatDate(value) : String(value || '—')
   if (column === 'link' || column === 'video_url') return <TableCell sx={{ maxWidth: 180 }}><Typography component={hasValue(value) ? 'a' : 'span'} href={hasValue(value) ? String(value) : undefined} target="_blank" rel="noreferrer" variant="body2" title={text} sx={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: hasValue(value) ? 'primary.main' : 'text.secondary' }}>{hasValue(value) ? 'Open link' : '—'}</Typography></TableCell>
-  return <TableCell sx={{ minWidth: column === 'description' ? 240 : 130, maxWidth: column === 'description' ? 360 : 220 }}><Typography variant="body2" title={text} sx={{ display: '-webkit-box', WebkitLineClamp: column === 'description' ? 3 : 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', overflowWrap: 'anywhere' }}>{text}</Typography></TableCell>
+  return <TableCell sx={{ minWidth: column === 'description' ? 220 : 110, maxWidth: column === 'description' ? 360 : 220 }}><Typography variant="body2" title={text} sx={{ display: '-webkit-box', WebkitLineClamp: column === 'description' ? 3 : 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', overflowWrap: 'anywhere', fontWeight: column === 'title' ? 600 : 400, color: column === 'description' ? 'text.secondary' : 'text.primary' }}>{text}</Typography></TableCell>
 }
 
 function ActionCell({ children }: { children: React.ReactNode }) { return <TableCell sx={{ position: { xs: 'static', sm: 'sticky' }, right: { sm: 0 }, bgcolor: 'background.paper', boxShadow: { xs: 'none', sm: '-8px 0 12px -12px rgba(15,40,72,.45)' }, whiteSpace: 'nowrap', width: { xs: 'auto', sm: 110 }, zIndex: { sm: 1 } }}>{children}</TableCell> }
@@ -204,8 +205,8 @@ function CrudSection({ section, project = false }: { section: Section; project?:
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
           <SortableContext items={rows.map(row => Number(row.id))} strategy={verticalListSortingStrategy}>
             <TableContainer component={Paper} variant="outlined" sx={{ maxWidth: '100%', overflowX: 'auto', borderRadius: 2.5 }}>
-              <Table stickyHeader size="small" sx={{ minWidth: project ? 1180 : section.id === 'jobs' ? 700 : 900 }}>
-                <TableHead><TableRow><HeaderCell>Order</HeaderCell>{section.columns.map(column => <HeaderCell key={column}>{labelFor(column === 'image_url' ? 'image' : column === 'client_name' ? 'status' : column)}</HeaderCell>)}<HeaderCell sticky>Actions</HeaderCell></TableRow></TableHead>
+              <Table stickyHeader size="small" sx={{ minWidth: project ? 1040 : section.id === 'jobs' ? 700 : 900 }}>
+                <TableHead><TableRow><HeaderCell>Order</HeaderCell>{section.columns.map(column => <HeaderCell key={column}>{labelFor(column === 'image_url' ? 'image' : column === 'client_name' ? 'client' : column)}</HeaderCell>)}<HeaderCell sticky>Actions</HeaderCell></TableRow></TableHead>
                 <TableBody>{!paged.length ? <EmptyRow columns={section.columns.length + 2} filtered={active} /> : paged.map(row => <SortableContentRow project={project} key={String(row.id)} row={row} columns={section.columns} fields={section.fields} disabled={!canReorder} expanded={expanded === Number(row.id)} onExpand={() => setExpanded(value => value === Number(row.id) ? null : Number(row.id))} onEdit={() => openForm(row)} onDelete={() => void remove(row)} />)}</TableBody>
               </Table>
             </TableContainer>
@@ -219,9 +220,15 @@ function CrudSection({ section, project = false }: { section: Section; project?:
 }
 
 function FilterSelect({ label, value = '', options, onChange }: { label: string; value?: string; options: string[]; onChange: (value: string) => void }) { return <TextField select label={label} value={value} onChange={event => onChange(event.target.value)} sx={{ minWidth: { xs: 'calc(50% - 6px)', sm: 140 } }}><MenuItem value="">All</MenuItem>{options.map(option => <MenuItem key={option} value={option}>{labelFor(option)}</MenuItem>)}</TextField> }
-function HeaderCell({ children, sticky = false }: { children?: React.ReactNode; sticky?: boolean }) { return <TableCell sx={{ bgcolor: '#123f77 !important', color: 'white', fontWeight: 750, whiteSpace: 'nowrap', ...(sticky ? { position: { xs: 'static', sm: 'sticky' }, right: { sm: 0 }, zIndex: { sm: 4 } } : {}) }}>{children}</TableCell> }
-function LoadingState() { return <Paper variant="outlined" sx={{ minHeight: 240, display: 'grid', placeItems: 'center', borderRadius: 2.5 }}><Box sx={{ textAlign: 'center' }}><CircularProgress size={32} /><Typography color="text.secondary" variant="body2" sx={{ mt: 1 }}>Loading records…</Typography></Box></Paper> }
-function SectionShell({ title, count, action, children }: { title: string; count: number; action?: React.ReactNode; children: React.ReactNode }) { return <Box><Box sx={{ display: 'flex', alignItems: { xs: 'flex-start', sm: 'center' }, justifyContent: 'space-between', flexDirection: { xs: 'column', sm: 'row' }, gap: 1.5, mb: 2.5 }}><Box><Typography variant="h5" component="h1">{title}</Typography><Typography variant="body2" color="text.secondary">{count} {count === 1 ? 'record' : 'records'} in this section</Typography></Box>{action}</Box>{children}</Box> }
+function HeaderCell({ children, sticky = false }: { children?: React.ReactNode; sticky?: boolean }) { return <TableCell sx={{ bgcolor: '#f8fafc !important', color: 'text.secondary', fontWeight: 600, whiteSpace: 'nowrap', ...(sticky ? { position: { xs: 'static', sm: 'sticky' }, right: { sm: 0 }, zIndex: { sm: 4 } } : {}) }}>{children}</TableCell> }
+function LoadingState() {
+  return <Paper variant="outlined" role="status" aria-label="Loading records" aria-busy="true" sx={{ overflow: 'hidden' }}>
+    <Box sx={{ px: 2, py: 1.5, bgcolor: '#f8fafc', borderBottom: '1px solid', borderColor: 'divider' }}><Skeleton width="60%" height={24} /></Box>
+    {Array.from({ length: 5 }, (_, index) => <Box key={index} sx={{ display: 'flex', gap: 3, alignItems: 'center', px: 2, py: 2, borderBottom: index < 4 ? '1px solid' : 0, borderColor: 'divider' }}><Skeleton variant="rounded" width={58} height={44} /><Box sx={{ flex: 1 }}><Skeleton width="40%" height={22} /><Skeleton width="75%" height={18} /></Box><Skeleton width={70} height={24} /></Box>)}
+  </Paper>
+}
+
+function SectionShell({ title, count, action, children }: { title: string; count: number; action?: React.ReactNode; children: React.ReactNode }) { return <Box><Box sx={{ display: 'flex', alignItems: { xs: 'flex-start', sm: 'center' }, justifyContent: 'space-between', flexDirection: { xs: 'column', sm: 'row' }, gap: 1.5, mb: 2.5 }}><Box><Typography variant="h5" component="h1">{title}</Typography><Typography variant="body2" color="text.secondary">{count} {count === 1 ? 'record' : 'records'}</Typography></Box>{action}</Box>{children}</Box> }
 
 function DateFilters({ from, to, setFrom, setTo }: { from: Dayjs | null; to: Dayjs | null; setFrom: (value: Dayjs | null) => void; setTo: (value: Dayjs | null) => void }) { return <LocalizationProvider dateAdapter={AdapterDayjs}><DatePicker label="From" value={from} onChange={setFrom} slotProps={{ textField: { sx: { width: { xs: 'calc(50% - 6px)', sm: 150 } } } }} /><DatePicker label="To" value={to} onChange={setTo} slotProps={{ textField: { sx: { width: { xs: 'calc(50% - 6px)', sm: 150 } } } }} /></LocalizationProvider> }
 function ReadOnlySection({ kind }: { kind: 'contacts' | 'applications' }) {
@@ -236,7 +243,7 @@ function ReadOnlySection({ kind }: { kind: 'contacts' | 'applications' }) {
   const active = Boolean(search.trim() || from || to || category || resume); const paged = filtered.slice(page * perPage, page * perPage + perPage)
   const columns = isContact ? ['name', 'email', 'subject', 'message', 'notification_status', 'notification_error', 'created_at'] : ['full_name', 'email', 'phone', 'job_title', 'cover_letter', 'resume_url', 'notification_status', 'notification_error', 'created_at']
   return <SectionShell title={title} count={rows.length}><FilterToolbar search={search} onSearch={setSearch} active={active} onClear={() => { setSearch(''); setFrom(null); setTo(null); setCategory(''); setResume('') }} count={filtered.length} total={rows.length} onExport={() => exportCsv(filtered, kind)}><DateFilters from={from} to={to} setFrom={setFrom} setTo={setTo} />{!isContact && <><FilterSelect label="Job title" value={category} options={categories} onChange={setCategory} /><FilterSelect label="Resume" value={resume} options={['yes', 'no']} onChange={setResume} /></>}</FilterToolbar>
-    {error ? <Alert severity="error" action={<Button onClick={() => void load()}>Retry</Button>}>{error}</Alert> : loading ? <LoadingState /> : <><TableContainer component={Paper} variant="outlined" sx={{ overflowX: 'auto', borderRadius: 2.5 }}><Table stickyHeader size="small" sx={{ minWidth: isContact ? 1000 : 1160 }}><TableHead><TableRow>{columns.map(column => <HeaderCell key={column}>{labelFor(column === 'created_at' ? 'date received' : column)}</HeaderCell>)}<HeaderCell>Details</HeaderCell></TableRow></TableHead><TableBody>{paged.length ? paged.map(row => <TableRow key={String(row.id)} hover>{columns.map(column => column === 'created_at' ? <TableCell key={column} sx={{ whiteSpace: 'nowrap' }}>{formatDate(row[column])}</TableCell> : column === 'resume_url' ? <TableCell key={column}>{hasValue(row[column]) ? <Button component="a" href={String(row[column])} target="_blank" rel="noreferrer" size="small">View resume</Button> : '—'}</TableCell> : <DataCell key={column} column={column === 'message' || column === 'cover_letter' ? 'description' : column} value={row[column]} row={row} />)}<TableCell><Button size="small" onClick={() => setSelectedSubmission(row)}>View full</Button></TableCell></TableRow>) : <EmptyRow columns={columns.length + 1} filtered={active} message={active ? undefined : `No ${isContact ? 'contact submissions' : 'job applications'} yet`} />}</TableBody></Table></TableContainer><ResponsivePagination count={filtered.length} page={page} perPage={perPage} setPage={setPage} setPerPage={setPerPage} /></>}
+    {error ? <Alert severity="error" action={<Button onClick={() => void load()}>Retry</Button>}>{error}</Alert> : loading ? <LoadingState /> : <><TableContainer component={Paper} variant="outlined" sx={{ overflowX: 'auto', borderRadius: 2.5 }}><Table stickyHeader size="small" sx={{ minWidth: isContact ? 1000 : 1160 }}><TableHead><TableRow>{columns.map(column => <HeaderCell key={column}>{labelFor(column === 'created_at' ? 'date received' : column)}</HeaderCell>)}<HeaderCell>Details</HeaderCell></TableRow></TableHead><TableBody>{paged.length ? paged.map(row => <TableRow key={String(row.id)} hover>{columns.map(column => column === 'created_at' ? <TableCell key={column} sx={{ whiteSpace: 'nowrap' }}>{formatDate(row[column])}</TableCell> : column === 'resume_url' ? <TableCell key={column}>{hasValue(row[column]) ? <Button component="a" href={String(row[column])} target="_blank" rel="noreferrer" size="small">View resume</Button> : '—'}</TableCell> : <DataCell key={column} column={column === 'message' || column === 'cover_letter' ? 'description' : column} value={row[column]} row={row} />)}<TableCell><Button size="small" onClick={() => setSelectedSubmission(row)}>View details</Button></TableCell></TableRow>) : <EmptyRow columns={columns.length + 1} filtered={active} message={active ? undefined : `No ${isContact ? 'contact submissions' : 'job applications'} yet`} />}</TableBody></Table></TableContainer><ResponsivePagination count={filtered.length} page={page} perPage={perPage} setPage={setPage} setPerPage={setPerPage} /></>}
     <Dialog open={selectedSubmission !== null} onClose={() => setSelectedSubmission(null)} fullWidth maxWidth="md" aria-labelledby="submission-details-title">
       <DialogTitle id="submission-details-title">{isContact ? 'Contact submission' : 'Job application'}</DialogTitle>
       <DialogContent dividers sx={{ display: 'grid', gap: 2.5 }}>
@@ -252,9 +259,28 @@ function ReadOnlySection({ kind }: { kind: 'contacts' | 'applications' }) {
   </SectionShell>
 }
 
-export default function AdminDashboard() {
+export default function AdminDashboard({ onSignOut, signingOut = false }: { onSignOut: () => void; signingOut?: boolean }) {
   const [tab, setTab] = useState(0)
-  return <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}><AppBar position="sticky" elevation={0} sx={{ bgcolor: '#0c2f5c', borderBottom: '1px solid rgba(255,255,255,.12)' }}><Toolbar sx={{ minHeight: { xs: 58, sm: 64 }, gap: 1.25 }}><Box sx={{ width: 34, height: 34, borderRadius: 1.25, bgcolor: '#1976d2', display: 'grid', placeItems: 'center' }}><Business fontSize="small" /></Box><Box sx={{ minWidth: 0 }}><Typography sx={{ fontWeight: 800, lineHeight: 1.15 }}>Loxon Admin</Typography><Typography variant="caption" sx={{ color: 'rgba(255,255,255,.72)', display: { xs: 'none', sm: 'block' } }}>Landing page content operations</Typography></Box><Chip label={TAB_LABELS[tab]} size="small" sx={{ ml: 'auto', maxWidth: { xs: 150, sm: 240 }, bgcolor: 'rgba(255,255,255,.12)', color: 'white', '.MuiChip-label': { overflow: 'hidden', textOverflow: 'ellipsis' } }} /></Toolbar><Box sx={{ borderTop: '1px solid rgba(255,255,255,.08)', px: { xs: 0.5, md: 2 } }}><Tabs value={tab} onChange={(_, value) => setTab(value)} variant="scrollable" scrollButtons="auto" aria-label="Admin sections" sx={{ minHeight: 46, '& .MuiTab-root': { minHeight: 46, color: 'rgba(255,255,255,.7)', textTransform: 'none', fontWeight: 650, px: 2 }, '& .Mui-selected': { color: 'white !important' }, '& .MuiTabs-indicator': { bgcolor: '#5fb1ff', height: 3 } }}>{TAB_LABELS.map(label => <Tab key={label} label={label} />)}</Tabs></Box></AppBar>
-    <Container maxWidth="xl" sx={{ py: { xs: 2.5, md: 4 }, px: { xs: 1.5, sm: 3 } }}>{tab === 0 && <CrudSection section={SECTIONS[0]} project />}{tab === 1 && <CrudSection section={SECTIONS[1]} />}{tab === 2 && <CrudSection section={SECTIONS[2]} />}{tab === 3 && <CrudSection section={SECTIONS[3]} />}{tab === 4 && <ReadOnlySection kind="contacts" />}{tab === 5 && <ReadOnlySection kind="applications" />}</Container>
+  const desktop = useMediaQuery('(min-width:1200px)')
+  return <Box sx={{ minHeight: '100dvh', bgcolor: 'background.default' }}>
+    <AppBar component="header" position="sticky" elevation={0} color="inherit" sx={{ bgcolor: 'background.paper', borderBottom: '1px solid', borderColor: 'divider' }}>
+      <Toolbar sx={{ minHeight: '64px !important', px: { xs: 2, sm: 3 }, gap: 1.5 }}>
+        <Box sx={{ width: 36, height: 36, borderRadius: 1, bgcolor: 'primary.main', color: 'white', display: 'grid', placeItems: 'center' }}><Business fontSize="small" /></Box>
+        <Typography component="span" sx={{ fontWeight: 600, fontSize: 18, letterSpacing: '-0.025em' }}>Loxon <Box component="span" sx={{ color: 'text.secondary', fontWeight: 400 }}>Admin</Box></Typography>
+        <Button color="inherit" startIcon={<Logout fontSize="small" />} disabled={signingOut} onClick={onSignOut} sx={{ ml: 'auto', color: 'text.secondary', whiteSpace: 'nowrap' }}>{signingOut ? 'Signing out…' : 'Sign out'}</Button>
+      </Toolbar>
+    </AppBar>
+    <Box sx={{ display: 'flex', flexDirection: { xs: 'column', lg: 'row' } }}>
+      <Box component="nav" aria-label="Admin sections" sx={{ width: { xs: '100%', lg: 232 }, flexShrink: 0, bgcolor: 'background.paper', borderRight: { lg: '1px solid' }, borderBottom: { xs: '1px solid', lg: 0 }, borderColor: 'divider', position: { lg: 'sticky' }, top: 64, alignSelf: 'flex-start', height: { lg: 'calc(100dvh - 64px)' }, overflowY: { lg: 'auto' }, p: { xs: 0, lg: 2 } }}>
+        <Tabs value={tab} onChange={(_, value) => setTab(value)} orientation={desktop ? 'vertical' : 'horizontal'} variant={desktop ? 'standard' : 'scrollable'} scrollButtons="auto" allowScrollButtonsMobile aria-label="Content and submissions" sx={{ '& .MuiTabs-indicator': { display: { lg: 'none' } }, '& .MuiTabs-list': { gap: { lg: 0.5 } }, '& .MuiTab-root': { minHeight: 44, px: 1.5, borderRadius: { lg: 1 }, textTransform: 'none', fontWeight: 500, color: 'text.secondary', justifyContent: 'flex-start', maxWidth: 'none', alignItems: 'center', '&.Mui-selected': { color: 'primary.main', bgcolor: { lg: 'primary.light' }, fontWeight: 600 } } }}>
+          {TAB_LABELS.map((label, index) => { const Icon = TAB_ICONS[index]; return <Tab key={label} id={'admin-tab-' + index} aria-controls="admin-section-panel" label={label} icon={desktop ? <Icon sx={{ fontSize: 20 }} /> : undefined} iconPosition="start" sx={index === 4 ? { mt: { lg: 2 }, borderTop: { lg: '1px solid' }, borderColor: 'divider' } : undefined} /> })}
+        </Tabs>
+      </Box>
+      <Container component="main" maxWidth={false} sx={{ flex: 1, minWidth: 0, py: { xs: 3, lg: 4 }, px: { xs: 2, sm: 3, lg: 4 } }}>
+        <Box role="tabpanel" id="admin-section-panel" aria-labelledby={'admin-tab-' + tab} sx={{ maxWidth: 1600, mx: 'auto' }}>
+          {tab === 0 && <CrudSection section={SECTIONS[0]} project />}{tab === 1 && <CrudSection section={SECTIONS[1]} />}{tab === 2 && <CrudSection section={SECTIONS[2]} />}{tab === 3 && <CrudSection section={SECTIONS[3]} />}{tab === 4 && <ReadOnlySection kind="contacts" />}{tab === 5 && <ReadOnlySection kind="applications" />}
+        </Box>
+      </Container>
+    </Box>
   </Box>
 }
