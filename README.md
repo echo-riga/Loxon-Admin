@@ -1,39 +1,59 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Loxon Admin
 
-## Getting Started
+The content management dashboard and API for Loxon Philippines, Inc. Staff manage projects and galleries, products and services, clients, memberships, partners, jobs, contact inquiries, and job applications. The companion [public website](https://github.com/echo-riga/Loxon-Website) consumes this API.
 
-First, run the development server:
+Built with Next.js 16, React 19, TypeScript, MUI, PostgreSQL, Cloudinary, Resend, and Upstash Redis. The chat endpoint integrates Groq.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+## Local setup
+
+Use Node.js 20.9 or newer.
+
+```sh
+npm ci
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Copy [.env.example](.env.example) to .env.local and configure your own services:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+| Configuration | Purpose |
+| --- | --- |
+| DATABASE_URL | PostgreSQL connection |
+| ADMIN_EMAIL, ADMIN_PASSWORD_HASH, ADMIN_SESSION_SECRET | Admin login and signed sessions |
+| UPSTASH_REDIS_REST_URL, UPSTASH_REDIS_REST_TOKEN | Shared rate limiting |
+| ALLOWED_ORIGINS | Exact origins permitted to call the API |
+| CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET | Signed image uploads |
+| RESEND_API_KEY, EMAIL_FROM, CONTACT_EMAIL_TO | Submission notification emails |
+| GROQ_API_KEY | Chat responses |
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+ADMIN_PASSWORD_HASH uses pbkdf2-sha256:iterations:salt-base64:hash-base64 with at least 100,000 iterations. Use a random session secret of at least 32 characters. No default admin password is provided.
 
-## Learn More
+The app expects an existing PostgreSQL schema. Review [schema.md](schema.md), the SQL in [migrations](migrations), and the migration prerequisites below; the content-order migration alone does not create a complete fresh database.
 
-To learn more about Next.js, take a look at the following resources:
+```sh
+npm run dev
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Open http://localhost:3000/login. When running the public website on port 3000, start Admin with npm run dev -- --port 3001 and point the website at that origin.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Checks and production build
 
-## Deploy on Vercel
+```sh
+npm run lint
+npm run test:cache
+npm run test:date
+npm run test:uploads
+node --test tests/content-order.test.cjs
+npm run build
+npm start
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Deploy as a server application, such as a Next.js project on Vercel. Configure the same server environment variables on the host and redeploy after changing them.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Source layout
+
+- [src/components/admin](src/components/admin): dashboard, forms, tables, and navigation.
+- [src/app/api](src/app/api): public content, submissions, authentication, chat, and upload routes.
+- [src/lib](src/lib): database access, sessions, validation, email, ordering, and rate limits.
+- [tests](tests): regression checks.
 
 ## Image uploads
 
